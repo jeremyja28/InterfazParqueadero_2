@@ -1,0 +1,36 @@
+C:\Users\elbet\Videos\Doc PUCESA\RevisionParking\InterfazParqueadero_2\bin\Debug\net10.0-windows\win-x86\Resources\ParkingLogo.png
+C:\Users\elbet\Videos\Doc PUCESA\RevisionParking\InterfazParqueadero_2\bin\Debug\net10.0-windows\win-x86\InterfazParqueadero.exe
+C:\Users\elbet\Videos\Doc PUCESA\RevisionParking\InterfazParqueadero_2\bin\Debug\net10.0-windows\win-x86\InterfazParqueadero.deps.json
+C:\Users\elbet\Videos\Doc PUCESA\RevisionParking\InterfazParqueadero_2\bin\Debug\net10.0-windows\win-x86\InterfazParqueadero.runtimeconfig.json
+C:\Users\elbet\Videos\Doc PUCESA\RevisionParking\InterfazParqueadero_2\bin\Debug\net10.0-windows\win-x86\InterfazParqueadero.dll
+C:\Users\elbet\Videos\Doc PUCESA\RevisionParking\InterfazParqueadero_2\bin\Debug\net10.0-windows\win-x86\InterfazParqueadero.pdb
+C:\Users\elbet\Videos\Doc PUCESA\RevisionParking\InterfazParqueadero_2\obj\Debug\net10.0-windows\win-x86\InterfazParqueadero.Form1.resources
+C:\Users\elbet\Videos\Doc PUCESA\RevisionParking\InterfazParqueadero_2\obj\Debug\net10.0-windows\win-x86\InterfazParqueadero.Properties.Resources.resources
+C:\Users\elbet\Videos\Doc PUCESA\RevisionParking\InterfazParqueadero_2\obj\Debug\net10.0-windows\win-x86\InterfazParqueadero.csproj.GenerateResource.cache
+C:\Users\elbet\Videos\Doc PUCESA\RevisionParking\InterfazParqueadero_2\obj\Debug\net10.0-windows\win-x86\InterfazParqueadero.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\elbet\Videos\Doc PUCESA\RevisionParking\InterfazParqueadero_2\obj\Debug\net10.0-windows\win-x86\InterfazParqueadero.AssemblyInfoInputs.cache
+C:\Users\elbet\Videos\Doc PUCESA\RevisionParking\InterfazParqueadero_2\obj\Debug\net10.0-windows\win-x86\InterfazParqueadero.AssemblyInfo.cs
+C:\Users\elbet\Videos\Doc PUCESA\RevisionParking\InterfazParqueadero_2\obj\Debug\net10.0-windows\win-x86\InterfazParqueadero.csproj.CoreCompileInputs.cache
+C:\Users\elbet\Videos\Doc PUCESA\RevisionParking\InterfazParqueadero_2\obj\Debug\net10.0-windows\win-x86\InterfazParqueadero.dll
+C:\Users\elbet\Videos\Doc PUCESA\RevisionParking\InterfazParqueadero_2\obj\Debug\net10.0-windows\win-x86\refint\InterfazParqueadero.dll
+C:\Users\elbet\Videos\Doc PUCESA\RevisionParking\InterfazParqueadero_2\obj\Debug\net10.0-windows\win-x86\InterfazParqueadero.pdb
+C:\Users\elbet\Videos\Doc PUCESA\RevisionParking\InterfazParqueadero_2\obj\Debug\net10.0-windows\win-x86\InterfazParqueadero.genruntimeconfig.cache
+C:\Users\elbet\Videos\Doc PUCESA\RevisionParking\InterfazParqueadero_2\obj\Debug\net10.0-windows\win-x86\ref\InterfazParqueadero.dll
+C:\Users\chanc\Downloads\InterfazParqueadero_2_BETO\InterfazParqueadero_2\bin\Debug\net10.0-windows\win-x86\Resources\ParkingLogo.png
+C:\Users\chanc\Downloads\InterfazParqueadero_2_BETO\InterfazParqueadero_2\bin\Debug\net10.0-windows\win-x86\InterfazParqueadero.exe
+C:\Users\chanc\Downloads\InterfazParqueadero_2_BETO\InterfazParqueadero_2\bin\Debug\net10.0-windows\win-x86\InterfazParqueadero.deps.json
+C:\Users\chanc\Downloads\InterfazParqueadero_2_BETO\InterfazParqueadero_2\bin\Debug\net10.0-windows\win-x86\InterfazParqueadero.runtimeconfig.json
+C:\Users\chanc\Downloads\InterfazParqueadero_2_BETO\InterfazParqueadero_2\bin\Debug\net10.0-windows\win-x86\InterfazParqueadero.dll
+C:\Users\chanc\Downloads\InterfazParqueadero_2_BETO\InterfazParqueadero_2\bin\Debug\net10.0-windows\win-x86\InterfazParqueadero.pdb
+C:\Users\chanc\Downloads\InterfazParqueadero_2_BETO\InterfazParqueadero_2\obj\Debug\net10.0-windows\win-x86\InterfazParqueadero.Form1.resources
+C:\Users\chanc\Downloads\InterfazParqueadero_2_BETO\InterfazParqueadero_2\obj\Debug\net10.0-windows\win-x86\InterfazParqueadero.Properties.Resources.resources
+C:\Users\chanc\Downloads\InterfazParqueadero_2_BETO\InterfazParqueadero_2\obj\Debug\net10.0-windows\win-x86\InterfazParqueadero.csproj.GenerateResource.cache
+C:\Users\chanc\Downloads\InterfazParqueadero_2_BETO\InterfazParqueadero_2\obj\Debug\net10.0-windows\win-x86\InterfazParqueadero.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\chanc\Downloads\InterfazParqueadero_2_BETO\InterfazParqueadero_2\obj\Debug\net10.0-windows\win-x86\InterfazParqueadero.AssemblyInfoInputs.cache
+C:\Users\chanc\Downloads\InterfazParqueadero_2_BETO\InterfazParqueadero_2\obj\Debug\net10.0-windows\win-x86\InterfazParqueadero.AssemblyInfo.cs
+C:\Users\chanc\Downloads\InterfazParqueadero_2_BETO\InterfazParqueadero_2\obj\Debug\net10.0-windows\win-x86\InterfazParqueadero.csproj.CoreCompileInputs.cache
+C:\Users\chanc\Downloads\InterfazParqueadero_2_BETO\InterfazParqueadero_2\obj\Debug\net10.0-windows\win-x86\InterfazParqueadero.dll
+C:\Users\chanc\Downloads\InterfazParqueadero_2_BETO\InterfazParqueadero_2\obj\Debug\net10.0-windows\win-x86\refint\InterfazParqueadero.dll
+C:\Users\chanc\Downloads\InterfazParqueadero_2_BETO\InterfazParqueadero_2\obj\Debug\net10.0-windows\win-x86\InterfazParqueadero.pdb
+C:\Users\chanc\Downloads\InterfazParqueadero_2_BETO\InterfazParqueadero_2\obj\Debug\net10.0-windows\win-x86\InterfazParqueadero.genruntimeconfig.cache
+C:\Users\chanc\Downloads\InterfazParqueadero_2_BETO\InterfazParqueadero_2\obj\Debug\net10.0-windows\win-x86\ref\InterfazParqueadero.dll

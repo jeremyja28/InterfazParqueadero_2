@@ -1,0 +1,1163 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.IO;
+using System.Linq;
+using System.Windows.Forms;
+
+namespace InterfazParqueadero
+{
+    /// <summary>
+    /// Formulario para registro de Tags — campos: Código TAG, Cédula, Nombres, Apellidos, Placa, Lugar Numerado.
+    /// CRUD completo + CSV import/export.
+    /// </summary>
+    public class TagRegistroForm : Form
+    {
+        // ═══════════════════════════════════════════════════════════
+        // PALETA PUCESA
+        // ═══════════════════════════════════════════════════════════
+        private static readonly Color AzulOscuro  = Color.FromArgb(0, 51, 102);
+        private static readonly Color AzulInst    = Color.FromArgb(0, 82, 165);
+        private static readonly Color AzulAccent  = Color.FromArgb(74, 144, 217);
+        private static readonly Color FondoClaro  = Color.FromArgb(245, 247, 250);
+        private static readonly Color BlancoCard  = Color.White;
+        private static readonly Color TextoOscuro = Color.FromArgb(26, 35, 50);
+        private static readonly Color VerdeEsm    = Color.FromArgb(40, 167, 69);
+        private static readonly Color RojoSuave   = Color.FromArgb(220, 53, 69);
+        private static readonly Color Dorado      = Color.FromArgb(255, 193, 7);
+
+        // ═══════════════════════════════════════════════════════════
+        // CONTROLES — Formulario de registro
+        // ═══════════════════════════════════════════════════════════
+        private TextBox txtTagID = null!;
+        private TextBox txtCedula = null!;
+        private TextBox txtNombres = null!;
+        private TextBox txtApellidos = null!;
+        private TextBox txtPlaca = null!;
+        private ComboBox cmbTipoUsuario = null!;
+        private TextBox txtFacultad = null!;
+        private NumericUpDown nudLugar = null!;
+        private DataGridView dgvTags = null!;
+        private Label lblContador = null!;
+        private Button btnRegistrar = null!;
+
+        private TextBox txtBuscar = null!;
+        private Label lblEstDocentes = null!;
+        private Label lblEstEstudiantes = null!;
+        private Label lblEstAdmin = null!;
+        private Label lblEstOtros = null!;
+
+        // Callback
+        public Action<string, string>? OnTagRegistrado;
+
+        public TagRegistroForm()
+        {
+            ConfigurarFormulario();
+            CrearContenido();
+            CargarDatosEnGrid();
+        }
+
+        private void ConfigurarFormulario()
+        {
+            Text = "Tags — Gestión de Vehículos";
+            ClientSize = new Size(1100, 740);
+            StartPosition = FormStartPosition.CenterParent;
+            WindowState = FormWindowState.Maximized;
+            FormBorderStyle = FormBorderStyle.Sizable;
+            MinimumSize = new Size(950, 680);
+            BackColor = FondoClaro;
+            Font = new Font("Segoe UI", 10f);
+            ShowInTaskbar = false;
+        }
+
+        private void CrearContenido()
+        {
+            // ── Header con gradiente ──
+            Panel panelHeader = new Panel
+            {
+                Dock = DockStyle.Top,
+                Size = new Size(1100, 55),
+                BackColor = AzulOscuro
+            };
+            panelHeader.Paint += (s, e) =>
+            {
+                using var brush = new System.Drawing.Drawing2D.LinearGradientBrush(
+                    new Point(0, 52), new Point(panelHeader.Width, 52),
+                    AzulAccent, Color.FromArgb(0, 150, 200));
+                e.Graphics.FillRectangle(brush, 0, 52, panelHeader.Width, 3);
+            };
+            Controls.Add(panelHeader);
+
+            Label lblHeader = new Label
+            {
+                Text = "🏷  Tags — Gestión de Vehículos",
+                Font = new Font("Segoe UI", 15f, FontStyle.Bold),
+                ForeColor = Color.White,
+                Location = new Point(18, 12),
+                AutoSize = true
+            };
+            panelHeader.Controls.Add(lblHeader);
+
+            // ── Botón Cerrar Ventana ──
+            Button btnCerrar = new Button
+            {
+                Text = "✕  Cerrar Ventana",
+                Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+                ForeColor = Color.White,
+                BackColor = Color.FromArgb(192, 57, 43),
+                FlatStyle = FlatStyle.Flat,
+                Size = new Size(160, 36),
+                Cursor = Cursors.Hand,
+                Anchor = AnchorStyles.Top | AnchorStyles.Right
+            };
+            btnCerrar.Location = new Point(panelHeader.Width - btnCerrar.Width - 12, 11);
+            btnCerrar.FlatAppearance.BorderSize = 0;
+            btnCerrar.Click += (s, e) => Close();
+            panelHeader.Controls.Add(btnCerrar);
+
+            // ═════════════════════════════════════════════════════════
+            // FORMULARIO DE REGISTRO — 3 campos por fila (sin superposición)
+            // ═════════════════════════════════════════════════════════
+            GroupBox panelRegistro = new GroupBox
+            {
+                Text = "  Registrar Nuevo Tag  ",
+                Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+                ForeColor = AzulInst,
+                BackColor = BlancoCard,
+                Location = new Point(15, 60),
+                Size = new Size(1070, 190),
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+            };
+            Controls.Add(panelRegistro);
+
+            // Posiciones Y para las 3 filas
+            int y1 = 28, y2 = 68, y3 = 108;
+            // Columnas: col1 input=100, col2 label=350 input=440, col3 label=650 input=740
+            int col1Lbl = 15, col1In = 100;
+            int col2Lbl = 340, col2In = 420;
+            int col3Lbl = 640, col3In = 720;
+
+            // ── Fila 1: TAG ID | Cédula | Nombres ──
+            Label lblTag = new Label { Text = "Código TAG:", Font = new Font("Segoe UI", 9f), ForeColor = TextoOscuro, Location = new Point(col1Lbl, y1 + 3), AutoSize = true };
+            panelRegistro.Controls.Add(lblTag);
+            txtTagID = new TextBox { Location = new Point(col1In, y1), Size = new Size(150, 28), Font = new Font("Segoe UI", 10f), BorderStyle = BorderStyle.FixedSingle, PlaceholderText = "1011" };
+            panelRegistro.Controls.Add(txtTagID);
+
+            Button btnDetectar = new Button
+            {
+                Text = "📡 Detectar",
+                Font = new Font("Segoe UI", 8.5f, FontStyle.Bold),
+                ForeColor = Color.White,
+                BackColor = Color.FromArgb(41, 128, 185),
+                FlatStyle = FlatStyle.Flat,
+                Location = new Point(col1In + 155, y1 - 1),
+                Size = new Size(90, 30),
+                Cursor = Cursors.Hand
+            };
+            btnDetectar.FlatAppearance.BorderSize = 0;
+            btnDetectar.Click += BtnDetectar_Click;
+            panelRegistro.Controls.Add(btnDetectar);
+
+            Label lblCed = new Label { Text = "Cédula:", Font = new Font("Segoe UI", 9f), ForeColor = TextoOscuro, Location = new Point(col2Lbl, y1 + 3), AutoSize = true };
+            panelRegistro.Controls.Add(lblCed);
+            txtCedula = new TextBox { Location = new Point(col2In, y1), Size = new Size(200, 28), Font = new Font("Segoe UI", 10f), BorderStyle = BorderStyle.FixedSingle, PlaceholderText = "1801234567", MaxLength = 13 };
+            panelRegistro.Controls.Add(txtCedula);
+
+            Label lblNom = new Label { Text = "Nombres:", Font = new Font("Segoe UI", 9f), ForeColor = TextoOscuro, Location = new Point(col3Lbl, y1 + 3), AutoSize = true };
+            panelRegistro.Controls.Add(lblNom);
+            txtNombres = new TextBox { Location = new Point(col3In, y1), Size = new Size(320, 28), Font = new Font("Segoe UI", 10f), BorderStyle = BorderStyle.FixedSingle, PlaceholderText = "María Fernanda" };
+            panelRegistro.Controls.Add(txtNombres);
+
+            // ── Fila 2: Apellidos | Placa | Tipo ──
+            Label lblApe = new Label { Text = "Apellidos:", Font = new Font("Segoe UI", 9f), ForeColor = TextoOscuro, Location = new Point(col1Lbl, y2 + 3), AutoSize = true };
+            panelRegistro.Controls.Add(lblApe);
+            txtApellidos = new TextBox { Location = new Point(col1In, y2), Size = new Size(220, 28), Font = new Font("Segoe UI", 10f), BorderStyle = BorderStyle.FixedSingle, PlaceholderText = "López Ruiz" };
+            panelRegistro.Controls.Add(txtApellidos);
+
+            Label lblPlaca = new Label { Text = "Placa:", Font = new Font("Segoe UI", 9f), ForeColor = TextoOscuro, Location = new Point(col2Lbl, y2 + 3), AutoSize = true };
+            panelRegistro.Controls.Add(lblPlaca);
+            txtPlaca = new TextBox { Location = new Point(col2In, y2), Size = new Size(140, 28), Font = new Font("Segoe UI", 10f), BorderStyle = BorderStyle.FixedSingle, CharacterCasing = CharacterCasing.Upper, PlaceholderText = "ABC-1234", MaxLength = 10 };
+            panelRegistro.Controls.Add(txtPlaca);
+
+            Label lblTipo = new Label { Text = "Tipo:", Font = new Font("Segoe UI", 9f), ForeColor = TextoOscuro, Location = new Point(col3Lbl, y2 + 3), AutoSize = true };
+            panelRegistro.Controls.Add(lblTipo);
+            cmbTipoUsuario = new ComboBox { Location = new Point(col3In, y2), Size = new Size(200, 28), Font = new Font("Segoe UI", 10f), DropDownStyle = ComboBoxStyle.DropDownList };
+            cmbTipoUsuario.Items.AddRange(new object[] { "Docente", "Estudiante", "Administrativo", "Visitante", "Personal de Servicio" });
+            cmbTipoUsuario.SelectedIndex = 0;
+            panelRegistro.Controls.Add(cmbTipoUsuario);
+
+            // ── Fila 3: Facultad | Lugar Nº | Botón REGISTRAR ──
+            Label lblFac = new Label { Text = "Facultad:", Font = new Font("Segoe UI", 9f), ForeColor = TextoOscuro, Location = new Point(col1Lbl, y3 + 3), AutoSize = true };
+            panelRegistro.Controls.Add(lblFac);
+            txtFacultad = new TextBox { Location = new Point(col1In, y3), Size = new Size(220, 28), Font = new Font("Segoe UI", 10f), BorderStyle = BorderStyle.FixedSingle, PlaceholderText = "Ingeniería en Sistemas" };
+            panelRegistro.Controls.Add(txtFacultad);
+
+            Label lblLugar = new Label { Text = "Lugar N°:", Font = new Font("Segoe UI", 9f), ForeColor = TextoOscuro, Location = new Point(col2Lbl, y3 + 3), AutoSize = true };
+            panelRegistro.Controls.Add(lblLugar);
+            nudLugar = new NumericUpDown
+            {
+                Location = new Point(col2In, y3),
+                Size = new Size(80, 28),
+                Font = new Font("Segoe UI", 10f),
+                Minimum = 0,
+                Maximum = 40,
+                Value = DataService.ObtenerSiguienteLugar(),
+                TextAlign = HorizontalAlignment.Center
+            };
+            panelRegistro.Controls.Add(nudLugar);
+
+            Label lblLugarInfo = new Label
+            {
+                Text = "(0 = sin asignar, 1-40)",
+                Font = new Font("Segoe UI", 8f),
+                ForeColor = Color.FromArgb(127, 140, 141),
+                Location = new Point(col2In + 90, y3 + 5),
+                AutoSize = true
+            };
+            panelRegistro.Controls.Add(lblLugarInfo);
+
+            btnRegistrar = new Button
+            {
+                Text = "➕  REGISTRAR",
+                Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+                ForeColor = Color.White,
+                BackColor = VerdeEsm,
+                FlatStyle = FlatStyle.Flat,
+                Location = new Point(880, y3 - 8),
+                Size = new Size(170, 48),
+                Cursor = Cursors.Hand,
+                Anchor = AnchorStyles.Top | AnchorStyles.Right
+            };
+            btnRegistrar.FlatAppearance.BorderSize = 0;
+            btnRegistrar.Click += BtnRegistrar_Click;
+            panelRegistro.Controls.Add(btnRegistrar);
+
+            // ═════════════════════════════════════════════════════════
+            // ESTADÍSTICAS
+            // ═════════════════════════════════════════════════════════
+            Panel panelStats = new Panel
+            {
+                Location = new Point(15, 258),
+                Size = new Size(1070, 32),
+                BackColor = Color.FromArgb(248, 249, 250),
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+            };
+            panelStats.Paint += (s, e) =>
+            {
+                using Pen p = new Pen(Color.FromArgb(220, 225, 230), 1);
+                e.Graphics.DrawRectangle(p, 0, 0, panelStats.Width - 1, panelStats.Height - 1);
+            };
+            Controls.Add(panelStats);
+
+            lblEstDocentes = new Label { Text = "📘 Docentes: 0", Font = new Font("Segoe UI", 9f, FontStyle.Bold), ForeColor = Color.FromArgb(41, 128, 185), Location = new Point(12, 6), AutoSize = true };
+            panelStats.Controls.Add(lblEstDocentes);
+
+            lblEstEstudiantes = new Label { Text = "📗 Estudiantes: 0", Font = new Font("Segoe UI", 9f, FontStyle.Bold), ForeColor = VerdeEsm, Location = new Point(180, 6), AutoSize = true };
+            panelStats.Controls.Add(lblEstEstudiantes);
+
+            lblEstAdmin = new Label { Text = "📙 Administrativos: 0", Font = new Font("Segoe UI", 9f, FontStyle.Bold), ForeColor = Dorado, Location = new Point(370, 6), AutoSize = true };
+            panelStats.Controls.Add(lblEstAdmin);
+
+            lblEstOtros = new Label { Text = "📕 Otros: 0", Font = new Font("Segoe UI", 9f, FontStyle.Bold), ForeColor = RojoSuave, Location = new Point(570, 6), AutoSize = true };
+            panelStats.Controls.Add(lblEstOtros);
+
+            // ═════════════════════════════════════════════════════════
+            // ACCIONES + BÚSQUEDA
+            // ═════════════════════════════════════════════════════════
+            Panel panelAcciones = new Panel
+            {
+                Location = new Point(15, 296),
+                Size = new Size(1070, 40),
+                BackColor = Color.Transparent,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+            };
+            Controls.Add(panelAcciones);
+
+            lblContador = new Label
+            {
+                Text = "Tags registrados: 0",
+                Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+                ForeColor = AzulInst,
+                Location = new Point(0, 8),
+                AutoSize = true
+            };
+            panelAcciones.Controls.Add(lblContador);
+
+            txtBuscar = new TextBox
+            {
+                Location = new Point(220, 5),
+                Size = new Size(250, 28),
+                Font = new Font("Segoe UI", 10f),
+                BorderStyle = BorderStyle.FixedSingle,
+                PlaceholderText = "🔍 Buscar tag, cédula, nombr..."
+            };
+            txtBuscar.TextChanged += (s, e) => FiltrarTags(txtBuscar.Text.Trim());
+            panelAcciones.Controls.Add(txtBuscar);
+
+            Button btnExportar = new Button
+            {
+                Text = "📤 Exportar",
+                Font = new Font("Segoe UI", 9f, FontStyle.Bold),
+                ForeColor = Color.White, BackColor = AzulAccent,
+                FlatStyle = FlatStyle.Flat,
+                Location = new Point(600, 2), Size = new Size(120, 36),
+                Cursor = Cursors.Hand, Anchor = AnchorStyles.Top | AnchorStyles.Right
+            };
+            btnExportar.FlatAppearance.BorderSize = 0;
+            btnExportar.Click += BtnExportar_Click;
+            panelAcciones.Controls.Add(btnExportar);
+
+            Button btnImportar = new Button
+            {
+                Text = "📥 Importar",
+                Font = new Font("Segoe UI", 9f, FontStyle.Bold),
+                ForeColor = Color.White, BackColor = AzulInst,
+                FlatStyle = FlatStyle.Flat,
+                Location = new Point(730, 2), Size = new Size(120, 36),
+                Cursor = Cursors.Hand, Anchor = AnchorStyles.Top | AnchorStyles.Right
+            };
+            btnImportar.FlatAppearance.BorderSize = 0;
+            btnImportar.Click += BtnImportar_Click;
+            panelAcciones.Controls.Add(btnImportar);
+
+            Button btnEditar = new Button
+            {
+                Text = "✏ Editar",
+                Font = new Font("Segoe UI", 9f, FontStyle.Bold),
+                ForeColor = Color.White, BackColor = Dorado,
+                FlatStyle = FlatStyle.Flat,
+                Location = new Point(860, 2), Size = new Size(120, 36),
+                Cursor = Cursors.Hand, Anchor = AnchorStyles.Top | AnchorStyles.Right
+            };
+            btnEditar.FlatAppearance.BorderSize = 0;
+            btnEditar.Click += BtnEditar_Click;
+            panelAcciones.Controls.Add(btnEditar);
+
+            // ═════════════════════════════════════════════════════════
+            // DATAGRIDVIEW
+            // ═════════════════════════════════════════════════════════
+            dgvTags = new DataGridView
+            {
+                Location = new Point(15, 340),
+                Size = new Size(1070, 300),
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
+                BackgroundColor = BlancoCard, BorderStyle = BorderStyle.None,
+                ReadOnly = true, AllowUserToAddRows = false,
+                AllowUserToDeleteRows = false, AllowUserToResizeRows = false,
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                RowHeadersVisible = false,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
+                GridColor = Color.FromArgb(230, 233, 236),
+                EnableHeadersVisualStyles = false
+            };
+
+            dgvTags.DefaultCellStyle.Font = new Font("Segoe UI", 10.5f);
+            dgvTags.DefaultCellStyle.ForeColor = TextoOscuro;
+            dgvTags.DefaultCellStyle.SelectionBackColor = Color.FromArgb(214, 234, 248);
+            dgvTags.DefaultCellStyle.SelectionForeColor = TextoOscuro;
+            dgvTags.DefaultCellStyle.Padding = new Padding(4, 4, 4, 4);
+            dgvTags.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 10.5f, FontStyle.Bold);
+            dgvTags.ColumnHeadersDefaultCellStyle.BackColor = AzulInst;
+            dgvTags.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+            dgvTags.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dgvTags.ColumnHeadersDefaultCellStyle.Padding = new Padding(6, 4, 6, 4);
+            dgvTags.ColumnHeadersHeight = 40;
+            dgvTags.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
+            dgvTags.RowTemplate.Height = 38;
+            dgvTags.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(248, 249, 250);
+
+            dgvTags.Columns.Add("TagID", "Código TAG");
+            dgvTags.Columns.Add("Cedula", "Cédula");
+            dgvTags.Columns.Add("Nombres", "Nombres");
+            dgvTags.Columns.Add("Apellidos", "Apellidos");
+            dgvTags.Columns.Add("Placa", "Placa");
+            dgvTags.Columns.Add("Tipo", "Tipo");
+            dgvTags.Columns.Add("Lugar", "Lugar");
+            dgvTags.Columns.Add("Facultad", "Facultad");
+
+            // Columna botón Activar/Desactivar en lugar de texto Estado
+            var btnColEstado = new DataGridViewButtonColumn
+            {
+                Name = "Estado",
+                HeaderText = "Estado",
+                Width = 130,
+                FlatStyle = FlatStyle.Flat
+            };
+            dgvTags.Columns.Add(btnColEstado);
+
+            dgvTags.Columns["TagID"]!.Width = 90;
+            dgvTags.Columns["Cedula"]!.Width = 115;
+            dgvTags.Columns["Nombres"]!.Width = 140;
+            dgvTags.Columns["Apellidos"]!.Width = 150;
+            dgvTags.Columns["Placa"]!.Width = 95;
+            dgvTags.Columns["Tipo"]!.Width = 110;
+            dgvTags.Columns["Lugar"]!.Width = 60;
+            dgvTags.Columns["Facultad"]!.Width = 190;
+
+            dgvTags.CellDoubleClick += (s, e) =>
+            {
+                if (e.RowIndex >= 0 && e.ColumnIndex != dgvTags.Columns["Estado"]!.Index)
+                    EditarRegistroSeleccionado();
+            };
+
+            // Handler para toggle activar/desactivar por fila
+            dgvTags.CellClick += DgvTags_CellClick_Toggle;
+
+            // Pintar botones con colores según estado
+            dgvTags.CellFormatting += DgvTags_CellFormatting;
+
+            Controls.Add(dgvTags);
+
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // FILTRAR / CARGAR
+        // ═══════════════════════════════════════════════════════════
+
+        private void FiltrarTags(string filtro)
+        {
+            dgvTags.Rows.Clear();
+            var todos = DataService.ObtenerTodosIncluyendoInactivos();
+            foreach (var v in todos)
+            {
+                if (!string.IsNullOrEmpty(filtro))
+                {
+                    string f = filtro.ToLower();
+                    if (!v.TagID.ToLower().Contains(f) &&
+                        !v.Cedula.ToLower().Contains(f) &&
+                        !v.Nombres.ToLower().Contains(f) &&
+                        !v.Apellidos.ToLower().Contains(f) &&
+                        !v.Placa.ToLower().Contains(f) &&
+                        !v.TipoUsuario.ToLower().Contains(f) &&
+                        !v.Facultad.ToLower().Contains(f))
+                        continue;
+                }
+                int rowIdx = dgvTags.Rows.Add(v.TagID, v.Cedula, v.Nombres, v.Apellidos, v.Placa, v.TipoUsuario,
+                    v.LugarAsignado > 0 ? v.LugarAsignado.ToString() : "—", v.Facultad,
+                    v.Activo ? "❌ Desactivar" : "✅ Activar");
+                if (!v.Activo)
+                {
+                    dgvTags.Rows[rowIdx].DefaultCellStyle.ForeColor = Color.FromArgb(180, 180, 180);
+                    dgvTags.Rows[rowIdx].DefaultCellStyle.Font = new Font(dgvTags.Font.FontFamily, 10.5f, FontStyle.Strikeout);
+                }
+            }
+            lblContador.Text = $"Tags mostrados: {dgvTags.Rows.Count} / {todos.Count}";
+        }
+
+        private void CargarDatosEnGrid()
+        {
+            dgvTags.Rows.Clear();
+            // Mostrar todos incluyendo inactivos para transparencia
+            var todos = DataService.ObtenerTodosIncluyendoInactivos();
+            foreach (var v in todos)
+            {
+                int rowIdx = dgvTags.Rows.Add(v.TagID, v.Cedula, v.Nombres, v.Apellidos, v.Placa, v.TipoUsuario,
+                    v.LugarAsignado > 0 ? v.LugarAsignado.ToString() : "—", v.Facultad,
+                    v.Activo ? "❌ Desactivar" : "✅ Activar");
+                if (!v.Activo)
+                {
+                    dgvTags.Rows[rowIdx].DefaultCellStyle.ForeColor = Color.FromArgb(180, 180, 180);
+                    dgvTags.Rows[rowIdx].DefaultCellStyle.Font = new Font(dgvTags.Font.FontFamily, 10.5f, FontStyle.Strikeout);
+                }
+            }
+            var activos = todos.Where(v => v.Activo).ToList();
+            lblContador.Text = $"Tags activos: {activos.Count} / Total: {todos.Count}";
+            ActualizarEstadisticas(activos.AsReadOnly());
+            nudLugar.Value = Math.Min(nudLugar.Maximum, DataService.ObtenerSiguienteLugar());
+        }
+
+        private void ActualizarEstadisticas(IReadOnlyCollection<VehicleInfo> todos)
+        {
+            int docentes = todos.Count(v => v.TipoUsuario == "Docente");
+            int estudiantes = todos.Count(v => v.TipoUsuario == "Estudiante");
+            int admin = todos.Count(v => v.TipoUsuario == "Administrativo");
+            int otros = todos.Count - docentes - estudiantes - admin;
+
+            lblEstDocentes.Text = $"📘 Docentes: {docentes}";
+            lblEstEstudiantes.Text = $"📗 Estudiantes: {estudiantes}";
+            lblEstAdmin.Text = $"📙 Administrativos: {admin}";
+            lblEstOtros.Text = $"📕 Otros: {otros}";
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // REGISTRAR
+        // ═══════════════════════════════════════════════════════════
+        private void BtnRegistrar_Click(object? sender, EventArgs e)
+        {
+            string tagId = txtTagID.Text.Trim();
+            string cedula = txtCedula.Text.Trim();
+            string nombres = txtNombres.Text.Trim();
+            string apellidos = txtApellidos.Text.Trim();
+            string placa = txtPlaca.Text.Trim().ToUpper();
+            string tipo = cmbTipoUsuario.SelectedItem?.ToString() ?? "Estudiante";
+            string facultad = txtFacultad.Text.Trim();
+            int lugar = (int)nudLugar.Value;
+
+            // ── Validaciones ──
+            if (string.IsNullOrEmpty(tagId)) { MostrarError("El Código TAG es obligatorio."); txtTagID.Focus(); return; }
+            if (!tagId.All(char.IsDigit)) { MostrarError("El Código TAG debe contener solo números."); txtTagID.Focus(); return; }
+
+            if (string.IsNullOrEmpty(cedula) || cedula.Length != 10 || !cedula.All(char.IsDigit))
+            { MostrarError("La cédula debe tener exactamente 10 dígitos numéricos."); txtCedula.Focus(); return; }
+            if (!ValidarCedulaEcuador(cedula))
+            { MostrarError("La cédula ingresada no es válida según el algoritmo de verificación ecuatoriano."); txtCedula.Focus(); return; }
+
+            if (string.IsNullOrEmpty(nombres) || nombres.Length < 2) { MostrarError("Los nombres son obligatorios (mínimo 2 caracteres)."); txtNombres.Focus(); return; }
+            if (string.IsNullOrEmpty(apellidos) || apellidos.Length < 2) { MostrarError("Los apellidos son obligatorios (mínimo 2 caracteres)."); txtApellidos.Focus(); return; }
+
+            if (!System.Text.RegularExpressions.Regex.IsMatch(placa, @"^[A-Z]{3}-?\d{3,4}$"))
+            { MostrarError("La placa debe tener el formato ABC-1234 (3 letras, guión opcional, 3 o 4 dígitos)."); txtPlaca.Focus(); return; }
+
+            if (tipo != "Visitante" && string.IsNullOrWhiteSpace(facultad))
+            { MostrarError("La facultad es obligatoria para usuarios que no sean visitantes."); txtFacultad.Focus(); return; }
+
+            var nuevo = new VehicleInfo
+            {
+                TagID = tagId,
+                Cedula = cedula,
+                Nombres = nombres,
+                Apellidos = apellidos,
+                Placa = placa,
+                TipoUsuario = tipo,
+                Facultad = facultad,
+                LugarAsignado = lugar,
+                ColorTipo = DataService.ObtenerColorTipo(tipo)
+            };
+
+            if (!DataService.AgregarVehiculo(nuevo))
+            {
+                MostrarError($"Ya existe un tag con ID '{tagId}'. Use otro identificador.");
+                txtTagID.Focus();
+                return;
+            }
+
+            CargarDatosEnGrid();
+            LimpiarFormulario();
+
+            OnTagRegistrado?.Invoke("Nuevo Tag Registrado", $"Tag {tagId} — {nombres} {apellidos} — {placa} ({tipo})");
+
+            MostrarPopupRegistroExitoso(tagId, cedula, $"{nombres} {apellidos}", placa, tipo, lugar);
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // EDITAR
+        // ═══════════════════════════════════════════════════════════
+        private void BtnEditar_Click(object? sender, EventArgs e) => EditarRegistroSeleccionado();
+
+        private void EditarRegistroSeleccionado()
+        {
+            if (dgvTags.SelectedRows.Count == 0) { MostrarError("Seleccione un registro para editar."); return; }
+
+            var row = dgvTags.SelectedRows[0];
+            string tagId = row.Cells["TagID"].Value?.ToString() ?? "";
+            var vehiculo = DataService.BuscarPorTag(tagId);
+            if (vehiculo == null) return;
+
+            using var editForm = new Form
+            {
+                Text = $"Editar Tag — {tagId}",
+                ClientSize = new Size(480, 420),
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                MaximizeBox = false, MinimizeBox = false,
+                BackColor = FondoClaro,
+                Font = new Font("Segoe UI", 10f)
+            };
+
+            int y = 18;
+            Label lblT = new Label { Text = $"Editando Tag: {tagId}", Font = new Font("Segoe UI", 11f, FontStyle.Bold), ForeColor = AzulInst, Location = new Point(20, y), AutoSize = true };
+            editForm.Controls.Add(lblT); y += 35;
+
+            Label lblC = new Label { Text = "Cédula:", Font = new Font("Segoe UI", 9f), Location = new Point(20, y + 3), AutoSize = true };
+            editForm.Controls.Add(lblC);
+            TextBox txtC = new TextBox { Text = vehiculo.Cedula, Location = new Point(120, y), Size = new Size(180, 26), Font = new Font("Segoe UI", 10f), BorderStyle = BorderStyle.FixedSingle, MaxLength = 13 };
+            editForm.Controls.Add(txtC); y += 36;
+
+            Label lblN = new Label { Text = "Nombres:", Font = new Font("Segoe UI", 9f), Location = new Point(20, y + 3), AutoSize = true };
+            editForm.Controls.Add(lblN);
+            TextBox txtN = new TextBox { Text = vehiculo.Nombres, Location = new Point(120, y), Size = new Size(320, 26), Font = new Font("Segoe UI", 10f), BorderStyle = BorderStyle.FixedSingle };
+            editForm.Controls.Add(txtN); y += 36;
+
+            Label lblA = new Label { Text = "Apellidos:", Font = new Font("Segoe UI", 9f), Location = new Point(20, y + 3), AutoSize = true };
+            editForm.Controls.Add(lblA);
+            TextBox txtA = new TextBox { Text = vehiculo.Apellidos, Location = new Point(120, y), Size = new Size(320, 26), Font = new Font("Segoe UI", 10f), BorderStyle = BorderStyle.FixedSingle };
+            editForm.Controls.Add(txtA); y += 36;
+
+            Label lblP = new Label { Text = "Placa:", Font = new Font("Segoe UI", 9f), Location = new Point(20, y + 3), AutoSize = true };
+            editForm.Controls.Add(lblP);
+            TextBox txtP = new TextBox { Text = vehiculo.Placa, Location = new Point(120, y), Size = new Size(180, 26), Font = new Font("Segoe UI", 10f), BorderStyle = BorderStyle.FixedSingle, CharacterCasing = CharacterCasing.Upper };
+            editForm.Controls.Add(txtP); y += 36;
+
+            Label lblTp = new Label { Text = "Tipo:", Font = new Font("Segoe UI", 9f), Location = new Point(20, y + 3), AutoSize = true };
+            editForm.Controls.Add(lblTp);
+            ComboBox cmbTp = new ComboBox { Location = new Point(120, y), Size = new Size(200, 26), Font = new Font("Segoe UI", 10f), DropDownStyle = ComboBoxStyle.DropDownList };
+            cmbTp.Items.AddRange(new object[] { "Docente", "Estudiante", "Administrativo", "Visitante", "Personal de Servicio" });
+            cmbTp.SelectedItem = vehiculo.TipoUsuario;
+            if (cmbTp.SelectedIndex < 0) cmbTp.SelectedIndex = 0;
+            editForm.Controls.Add(cmbTp); y += 36;
+
+            Label lblF = new Label { Text = "Facultad:", Font = new Font("Segoe UI", 9f), Location = new Point(20, y + 3), AutoSize = true };
+            editForm.Controls.Add(lblF);
+            TextBox txtF = new TextBox { Text = vehiculo.Facultad, Location = new Point(120, y), Size = new Size(320, 26), Font = new Font("Segoe UI", 10f), BorderStyle = BorderStyle.FixedSingle };
+            editForm.Controls.Add(txtF); y += 36;
+
+            Label lblL = new Label { Text = "Lugar N°:", Font = new Font("Segoe UI", 9f), Location = new Point(20, y + 3), AutoSize = true };
+            editForm.Controls.Add(lblL);
+            NumericUpDown nudL = new NumericUpDown { Location = new Point(120, y), Size = new Size(80, 26), Font = new Font("Segoe UI", 10f), Minimum = 0, Maximum = 40, Value = vehiculo.LugarAsignado };
+            editForm.Controls.Add(nudL); y += 45;
+
+            Button btnGuardar = new Button
+            {
+                Text = "✓  GUARDAR CAMBIOS",
+                Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+                ForeColor = Color.White, BackColor = AzulAccent,
+                FlatStyle = FlatStyle.Flat,
+                Location = new Point(20, y), Size = new Size(240, 42),
+                Cursor = Cursors.Hand
+            };
+            btnGuardar.FlatAppearance.BorderSize = 0;
+            btnGuardar.Click += (s, ev) =>
+            {
+                // Validaciones (mismas que en registro nuevo)
+                string cedula = txtC.Text.Trim();
+                string nombres = txtN.Text.Trim();
+                string apellidos = txtA.Text.Trim();
+                string placa = txtP.Text.Trim().ToUpper();
+                string tipo = cmbTp.SelectedItem?.ToString() ?? "Estudiante";
+                string facultad = txtF.Text.Trim();
+
+                if (cedula.Length != 10 || !cedula.All(char.IsDigit))
+                {
+                    MessageBox.Show("La cédula debe tener exactamente 10 dígitos numéricos.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+                if (!ValidarCedulaEcuador(cedula))
+                {
+                    MessageBox.Show("La cédula ingresada no es válida (módulo 10).", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+                if (nombres.Length < 2)
+                {
+                    MessageBox.Show("Ingrese nombres válidos (mínimo 2 caracteres).", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+                if (apellidos.Length < 2)
+                {
+                    MessageBox.Show("Ingrese apellidos válidos (mínimo 2 caracteres).", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+                if (!System.Text.RegularExpressions.Regex.IsMatch(placa, @"^[A-Z]{3}-?\d{3,4}$"))
+                {
+                    MessageBox.Show("La placa debe tener formato ecuatoriano: ABC-1234 o ABC1234.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+                if (tipo != "Visitante" && string.IsNullOrWhiteSpace(facultad))
+                {
+                    MessageBox.Show("La facultad es obligatoria para usuarios no visitantes.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                vehiculo.Cedula = cedula;
+                vehiculo.Nombres = nombres;
+                vehiculo.Apellidos = apellidos;
+                vehiculo.Placa = placa;
+                vehiculo.TipoUsuario = tipo;
+                vehiculo.Facultad = facultad;
+                vehiculo.LugarAsignado = (int)nudL.Value;
+                vehiculo.ColorTipo = DataService.ObtenerColorTipo(tipo);
+                DataService.ActualizarVehiculo(vehiculo);
+                editForm.DialogResult = DialogResult.OK;
+                editForm.Close();
+            };
+            editForm.Controls.Add(btnGuardar);
+
+            Button btnCancelar = new Button
+            {
+                Text = "Cancelar", DialogResult = DialogResult.Cancel,
+                Font = new Font("Segoe UI", 10f), ForeColor = TextoOscuro,
+                BackColor = Color.FromArgb(218, 223, 225),
+                FlatStyle = FlatStyle.Flat,
+                Location = new Point(280, y), Size = new Size(160, 42),
+                Cursor = Cursors.Hand
+            };
+            btnCancelar.FlatAppearance.BorderColor = Color.FromArgb(189, 195, 199);
+            editForm.Controls.Add(btnCancelar);
+
+            if (editForm.ShowDialog(this) == DialogResult.OK)
+            {
+
+                CargarDatosEnGrid();
+                OnTagRegistrado?.Invoke("Tag Actualizado", $"Tag {tagId} — {vehiculo.Nombre} actualizado");
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // ACTIVAR / DESACTIVAR  (toggle por fila)
+        // ═══════════════════════════════════════════════════════════
+        private void DgvTags_CellClick_Toggle(object? sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0) return;
+            if (e.ColumnIndex != dgvTags.Columns["Estado"]!.Index) return;
+
+            var row = dgvTags.Rows[e.RowIndex];
+            string tagId = row.Cells["TagID"].Value?.ToString() ?? "";
+            string nombres = row.Cells["Nombres"].Value?.ToString() ?? "";
+            string apellidos = row.Cells["Apellidos"].Value?.ToString() ?? "";
+
+            var vehiculo = DataService.BuscarPorTag(tagId);
+            if (vehiculo == null) return;
+
+            string accion = vehiculo.Activo ? "DESACTIVAR" : "ACTIVAR";
+            Color accentColor = vehiculo.Activo ? RojoSuave : VerdeEsm;
+            string icono = vehiculo.Activo ? "⛔" : "✅";
+            var result = MostrarConfirmacionTag($"{icono} {accion} Tag",
+                $"¿Está seguro de {accion} este tag?\n\n🏷 Tag: {tagId}\n👤 {nombres} {apellidos}\n\n{(vehiculo.Activo ? "El usuario no podrá acceder al parqueadero." : "Se restaurará el acceso al parqueadero.")}",
+                accion, accentColor);
+
+            if (result == DialogResult.OK)
+            {
+                bool nuevoEstado = DataService.ToggleActivoVehiculo(tagId);
+                string sql = nuevoEstado
+                    ? $"UPDATE vehiculos_registrados SET activo=1 WHERE tag_id='{tagId}' — {nombres} {apellidos} (activado)"
+                    : $"UPDATE vehiculos_registrados SET activo=0 WHERE tag_id='{tagId}' — {nombres} {apellidos} (desactivado)";
+
+                CargarDatosEnGrid();
+                OnTagRegistrado?.Invoke(nuevoEstado ? "Tag Activado" : "Tag Desactivado",
+                    $"Tag {tagId} — {nombres} {apellidos} {(nuevoEstado ? "activado" : "desactivado")}");
+            }
+        }
+
+        private void DgvTags_CellFormatting(object? sender, DataGridViewCellFormattingEventArgs e)
+        {
+            if (e.RowIndex < 0) return;
+            if (e.ColumnIndex != dgvTags.Columns["Estado"]!.Index) return;
+
+            string val = e.Value?.ToString() ?? "";
+            if (val.Contains("Desactivar"))
+            {
+                e.CellStyle!.BackColor = RojoSuave;
+                e.CellStyle.ForeColor = Color.White;
+                e.CellStyle.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
+                e.CellStyle.SelectionBackColor = RojoSuave;
+                e.CellStyle.SelectionForeColor = Color.White;
+            }
+            else
+            {
+                e.CellStyle!.BackColor = VerdeEsm;
+                e.CellStyle.ForeColor = Color.White;
+                e.CellStyle.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
+                e.CellStyle.SelectionBackColor = VerdeEsm;
+                e.CellStyle.SelectionForeColor = Color.White;
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // EXPORTAR CSV
+        // ═══════════════════════════════════════════════════════════
+        private void BtnExportar_Click(object? sender, EventArgs e)
+        {
+            using SaveFileDialog sfd = new() { Filter = "Archivo CSV|*.csv", Title = "Exportar Tags Registrados", FileName = $"Tags_PUCESA_{DateTime.Now:yyyyMMdd_HHmmss}.csv" };
+            if (sfd.ShowDialog() == DialogResult.OK)
+            {
+                try
+                {
+                    var sb = new System.Text.StringBuilder();
+                    sb.AppendLine("TagID,Cedula,Nombres,Apellidos,Placa,TipoUsuario,Facultad,LugarAsignado");
+                    foreach (var v in DataService.ObtenerTodos())
+                        sb.AppendLine($"\"{v.TagID}\",\"{v.Cedula}\",\"{v.Nombres}\",\"{v.Apellidos}\",\"{v.Placa}\",\"{v.TipoUsuario}\",\"{v.Facultad}\",{v.LugarAsignado}");
+                    File.WriteAllText(sfd.FileName, sb.ToString(), System.Text.Encoding.UTF8);
+
+                    MostrarConfirmacionTag("✅ Exportación Completa",
+                        $"Se exportaron {DataService.ObtenerTodos().Count} tags exitosamente.\n\n📁 Archivo: {sfd.FileName}",
+                        "Aceptar", VerdeEsm);
+                    OnTagRegistrado?.Invoke("Exportación de Tags", $"Exportados {DataService.ObtenerTodos().Count} tags a CSV");
+                }
+                catch (Exception ex) { MostrarError($"Error al exportar: {ex.Message}"); }
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // IMPORTAR CSV
+        // ═══════════════════════════════════════════════════════════
+        private void BtnImportar_Click(object? sender, EventArgs e)
+        {
+            using OpenFileDialog ofd = new() { Filter = "Archivo CSV|*.csv|Todos|*.*", Title = "Importar Tags desde CSV" };
+            if (ofd.ShowDialog() == DialogResult.OK)
+            {
+                try
+                {
+                    string[] lineas = File.ReadAllLines(ofd.FileName, System.Text.Encoding.UTF8);
+                    int importados = 0, errores = 0, duplicados = 0;
+                    int inicio = 0;
+                    if (lineas.Length > 0 && lineas[0].ToLower().Contains("tagid")) inicio = 1;
+
+                    for (int i = inicio; i < lineas.Length; i++)
+                    {
+                        string linea = lineas[i].Trim();
+                        if (string.IsNullOrEmpty(linea)) continue;
+                        try
+                        {
+                            var campos = ParsearLineaCSV(linea);
+                            if (campos.Count < 5) { errores++; continue; }
+
+                            string tipo = campos.Count > 5 ? campos[5] : "Estudiante";
+                            string facultad = campos.Count > 6 ? campos[6] : "";
+                            int lugar = campos.Count > 7 && int.TryParse(campos[7], out int l) ? l : 0;
+
+                            var vehiculo = new VehicleInfo
+                            {
+                                TagID = campos[0],
+                                Cedula = campos[1],
+                                Nombres = campos[2],
+                                Apellidos = campos[3],
+                                Placa = campos[4],
+                                TipoUsuario = tipo,
+                                Facultad = facultad,
+                                LugarAsignado = lugar,
+                                ColorTipo = DataService.ObtenerColorTipo(tipo)
+                            };
+
+                            if (DataService.AgregarVehiculo(vehiculo)) importados++;
+                            else duplicados++;
+                        }
+                        catch { errores++; }
+                    }
+
+                    CargarDatosEnGrid();
+
+                    MostrarConfirmacionTag("✅ Importación Completada",
+                        $"Resultado de la importación:\n\n✓ Importados: {importados}\n⚠ Duplicados (omitidos): {duplicados}\n✕ Errores: {errores}",
+                        "Aceptar", VerdeEsm);
+                    OnTagRegistrado?.Invoke("Importación de Tags", $"Importados {importados} tags desde CSV");
+                }
+                catch (Exception ex) { MostrarError($"Error al leer el archivo: {ex.Message}"); }
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // UTILIDADES
+        // ═══════════════════════════════════════════════════════════
+        private static List<string> ParsearLineaCSV(string linea)
+        {
+            var campos = new List<string>();
+            bool enComillas = false;
+            var campo = new System.Text.StringBuilder();
+            foreach (char c in linea)
+            {
+                if (c == '"') { enComillas = !enComillas; }
+                else if (c == ',' && !enComillas) { campos.Add(campo.ToString().Trim()); campo.Clear(); }
+                else { campo.Append(c); }
+            }
+            campos.Add(campo.ToString().Trim());
+            return campos;
+        }
+
+        private void LimpiarFormulario()
+        {
+            txtTagID.Text = "";
+            txtCedula.Text = "";
+            txtNombres.Text = "";
+            txtApellidos.Text = "";
+            txtPlaca.Text = "";
+            cmbTipoUsuario.SelectedIndex = 0;
+            txtFacultad.Text = "";
+            nudLugar.Value = Math.Min(nudLugar.Maximum, DataService.ObtenerSiguienteLugar());
+            txtTagID.Focus();
+        }
+
+        private void MostrarError(string mensaje) =>
+            MessageBox.Show(mensaje, "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+
+        // ═══════════════════════════════════════════════════════════
+        // DETECTAR TAG — escucha próximo tag leído por el sensor
+        // ═══════════════════════════════════════════════════════════
+        /// <summary>
+        /// Callback estático para que Form1 envíe el código de tag capturado.
+        /// Se establece cuando se presiona "Detectar" y se limpia al cerrar el diálogo.
+        /// </summary>
+        public static Action<string>? OnTagCapturadoCallback { get; set; }
+
+        private void BtnDetectar_Click(object? sender, EventArgs e)
+        {
+            // Crear diálogo de espera
+            Form dialogo = new Form
+            {
+                Text = "Detectar Tag RFID",
+                Size = new Size(420, 200),
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                MaximizeBox = false,
+                MinimizeBox = false,
+                BackColor = Color.FromArgb(245, 248, 252)
+            };
+
+            Label lblMensaje = new Label
+            {
+                Text = "📡  Acerque el tag al sensor del lector...",
+                Font = new Font("Segoe UI", 12f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(41, 128, 185),
+                TextAlign = ContentAlignment.MiddleCenter,
+                Dock = DockStyle.Top,
+                Height = 60,
+                Padding = new Padding(0, 20, 0, 0)
+            };
+            dialogo.Controls.Add(lblMensaje);
+
+            Label lblEstado = new Label
+            {
+                Text = "Esperando lectura...",
+                Font = new Font("Segoe UI", 10f),
+                ForeColor = Color.FromArgb(149, 165, 166),
+                TextAlign = ContentAlignment.MiddleCenter,
+                Dock = DockStyle.Top,
+                Height = 30
+            };
+            dialogo.Controls.Add(lblEstado);
+
+            Button btnCancelar = new Button
+            {
+                Text = "Cancelar",
+                Font = new Font("Segoe UI", 9f, FontStyle.Bold),
+                ForeColor = Color.White,
+                BackColor = Color.FromArgb(192, 57, 43),
+                FlatStyle = FlatStyle.Flat,
+                Size = new Size(120, 36),
+                Cursor = Cursors.Hand,
+                DialogResult = DialogResult.Cancel
+            };
+            btnCancelar.FlatAppearance.BorderSize = 0;
+            btnCancelar.Location = new Point((dialogo.ClientSize.Width - 120) / 2, 120);
+            dialogo.Controls.Add(btnCancelar);
+
+            string? tagDetectado = null;
+
+            // Registrar callback para recibir tag desde Form1
+            OnTagCapturadoCallback = (codigoTag) =>
+            {
+                if (dialogo.InvokeRequired)
+                {
+                    dialogo.Invoke(() =>
+                    {
+                        tagDetectado = codigoTag;
+                        lblEstado.Text = $"✅ Tag detectado: {codigoTag}";
+                        lblEstado.ForeColor = Color.FromArgb(39, 174, 96);
+                        dialogo.DialogResult = DialogResult.OK;
+                        dialogo.Close();
+                    });
+                }
+                else
+                {
+                    tagDetectado = codigoTag;
+                    lblEstado.Text = $"✅ Tag detectado: {codigoTag}";
+                    lblEstado.ForeColor = Color.FromArgb(39, 174, 96);
+                    dialogo.DialogResult = DialogResult.OK;
+                    dialogo.Close();
+                }
+            };
+
+            DialogResult result = dialogo.ShowDialog(this);
+
+            // Limpiar callback
+            OnTagCapturadoCallback = null;
+
+            if (result == DialogResult.OK && !string.IsNullOrEmpty(tagDetectado))
+            {
+                txtTagID.Text = tagDetectado;
+                // Poner foco en el siguiente campo vacío
+                if (string.IsNullOrEmpty(txtCedula.Text))
+                    txtCedula.Focus();
+                else if (string.IsNullOrEmpty(txtNombres.Text))
+                    txtNombres.Focus();
+                else
+                    txtPlaca.Focus();
+            }
+        }
+
+        /// <summary>
+        /// Valida una cédula ecuatoriana usando el algoritmo de módulo 10.
+        /// </summary>
+        private static bool ValidarCedulaEcuador(string cedula)
+        {
+            if (cedula.Length != 10 || !cedula.All(char.IsDigit)) return false;
+            int provincia = int.Parse(cedula[..2]);
+            if (provincia < 1 || provincia > 24) return false;
+            int tercero = int.Parse(cedula[2].ToString());
+            if (tercero >= 6) return false;
+
+            int[] coeficientes = { 2, 1, 2, 1, 2, 1, 2, 1, 2 };
+            int suma = 0;
+            for (int i = 0; i < 9; i++)
+            {
+                int val = int.Parse(cedula[i].ToString()) * coeficientes[i];
+                if (val >= 10) val -= 9;
+                suma += val;
+            }
+            int digitoVerificador = (10 - (suma % 10)) % 10;
+            return digitoVerificador == int.Parse(cedula[9].ToString());
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // POPUP DE CONFIRMACIÓN ESTILIZADO
+        // ═══════════════════════════════════════════════════════════
+        private DialogResult MostrarConfirmacionTag(string titulo, string mensaje, string botonTexto, Color accentColor)
+        {
+            using var popup = new Form
+            {
+                ClientSize = new Size(460, 280),
+                FormBorderStyle = FormBorderStyle.None,
+                StartPosition = FormStartPosition.CenterParent,
+                BackColor = BlancoCard,
+                ShowInTaskbar = false, TopMost = true
+            };
+            popup.Paint += (s, e) =>
+            {
+                using Pen p = new Pen(accentColor, 2);
+                e.Graphics.DrawRectangle(p, 1, 1, popup.Width - 3, popup.Height - 3);
+            };
+            Panel barra = new Panel { Dock = DockStyle.Top, Height = 5, BackColor = accentColor };
+            popup.Controls.Add(barra);
+            Label lblT = new Label { Text = titulo, Font = new Font("Segoe UI", 14f, FontStyle.Bold), ForeColor = accentColor, Location = new Point(25, 20), AutoSize = true };
+            popup.Controls.Add(lblT);
+            Label lblM = new Label { Text = mensaje, Font = new Font("Segoe UI", 10f), ForeColor = TextoOscuro, Location = new Point(25, 55), Size = new Size(410, 140) };
+            popup.Controls.Add(lblM);
+            Button btnOk = new Button { Text = botonTexto, Font = new Font("Segoe UI", 10f, FontStyle.Bold), ForeColor = Color.White, BackColor = accentColor, FlatStyle = FlatStyle.Flat, Location = new Point(25, 220), Size = new Size(200, 42), Cursor = Cursors.Hand, DialogResult = DialogResult.OK };
+            btnOk.FlatAppearance.BorderSize = 0;
+            popup.Controls.Add(btnOk);
+            Button btnCan = new Button { Text = "Cancelar", Font = new Font("Segoe UI", 10f), ForeColor = TextoOscuro, BackColor = Color.FromArgb(220, 225, 230), FlatStyle = FlatStyle.Flat, Location = new Point(240, 220), Size = new Size(130, 42), Cursor = Cursors.Hand, DialogResult = DialogResult.Cancel };
+            btnCan.FlatAppearance.BorderColor = Color.FromArgb(190, 195, 200);
+            popup.Controls.Add(btnCan);
+            return popup.ShowDialog(this);
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // POPUP ANIMADO DE REGISTRO EXITOSO
+        // ═══════════════════════════════════════════════════════════
+        private async void MostrarPopupRegistroExitoso(string tag, string cedula, string nombre, string placa, string tipo, int lugar)
+        {
+            var popup = new Form
+            {
+                Size = new Size(460, 420),
+                FormBorderStyle = FormBorderStyle.None,
+                StartPosition = FormStartPosition.CenterParent,
+                BackColor = Color.White,
+                ShowInTaskbar = false,
+                TopMost = true
+            };
+
+            popup.Paint += (s, e) =>
+            {
+                using var pen = new Pen(VerdeEsm, 3);
+                e.Graphics.DrawRectangle(pen, 1, 1, popup.Width - 3, popup.Height - 3);
+            };
+
+            Panel barra = new Panel { Dock = DockStyle.Top, Height = 5, BackColor = VerdeEsm };
+            popup.Controls.Add(barra);
+
+            Label lblIcono = new Label
+            {
+                Text = "⏳",
+                Font = new Font("Segoe UI Emoji", 48f),
+                TextAlign = ContentAlignment.MiddleCenter,
+                Size = new Size(100, 80),
+                Location = new Point(180, 15),
+                BackColor = Color.Transparent
+            };
+            popup.Controls.Add(lblIcono);
+
+            Label lblTitulo = new Label
+            {
+                Text = "Registrando Tag...",
+                Font = new Font("Segoe UI", 16f, FontStyle.Bold),
+                ForeColor = AzulInst,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Size = new Size(420, 35),
+                Location = new Point(20, 100)
+            };
+            popup.Controls.Add(lblTitulo);
+
+            // Datos del registro
+            Label lblDatos = new Label
+            {
+                Text = $"🏷 Tag: {tag}\n📋 Cédula: {cedula}\n👤 {nombre}\n🚗 Placa: {placa}\n🎓 {tipo}\n📍 Lugar: {(lugar > 0 ? lugar.ToString() : "Sin asignar")}",
+                Font = new Font("Segoe UI", 10f),
+                ForeColor = TextoOscuro,
+                Location = new Point(30, 145),
+                Size = new Size(400, 130)
+            };
+            popup.Controls.Add(lblDatos);
+
+            // Barra de progreso
+            Panel progressBg = new Panel
+            {
+                Location = new Point(30, 285),
+                Size = new Size(400, 8),
+                BackColor = Color.FromArgb(230, 235, 240)
+            };
+            popup.Controls.Add(progressBg);
+
+            Panel progressFill = new Panel
+            {
+                Location = new Point(0, 0),
+                Size = new Size(0, 8),
+                BackColor = VerdeEsm
+            };
+            progressBg.Controls.Add(progressFill);
+
+            Label lblEstado = new Label
+            {
+                Text = "",
+                Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+                ForeColor = VerdeEsm,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Size = new Size(420, 30),
+                Location = new Point(20, 305),
+                Visible = false
+            };
+            popup.Controls.Add(lblEstado);
+
+            // Botón cerrar (aparece después)
+            Button btnCerrar = new Button
+            {
+                Text = "✓  Aceptar",
+                Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+                ForeColor = Color.White,
+                BackColor = VerdeEsm,
+                FlatStyle = FlatStyle.Flat,
+                Size = new Size(180, 40),
+                Location = new Point(140, 345),
+                Cursor = Cursors.Hand,
+                Visible = false
+            };
+            btnCerrar.FlatAppearance.BorderSize = 0;
+            btnCerrar.Click += (s, e) => { popup.Close(); popup.Dispose(); };
+            popup.Controls.Add(btnCerrar);
+
+            popup.Show(this);
+
+            // Animación
+            string[] pasos = { "Validando datos...", "Generando registro...", "Guardando en base de datos...", "Sincronizando con lector RFID..." };
+            for (int i = 0; i <= 100; i += 3)
+            {
+                progressFill.Width = (int)(400.0 * i / 100);
+                if (i < 25) { } else if (i < 50) { } else if (i < 75) { } // keep progress smooth
+                int pasoIdx = Math.Min(i / 25, pasos.Length - 1);
+                lblDatos.Text = $"🏷 Tag: {tag}\n📋 Cédula: {cedula}\n👤 {nombre}\n🚗 Placa: {placa}\n🎓 {tipo}\n\n⏳ {pasos[pasoIdx]}";
+                await Task.Delay(35);
+            }
+
+            // Éxito
+            lblIcono.Text = "✅";
+            lblIcono.Font = new Font("Segoe UI Emoji", 52f);
+            lblTitulo.Text = "¡Registro Exitoso!";
+            lblTitulo.ForeColor = VerdeEsm;
+            progressFill.Width = 400;
+            lblDatos.Text = $"🏷 Tag: {tag}\n📋 Cédula: {cedula}\n👤 {nombre}\n🚗 Placa: {placa}\n🎓 {tipo}\n📍 Lugar: {(lugar > 0 ? lugar.ToString() : "Sin asignar")}";
+            lblEstado.Text = "✓  Tag registrado correctamente en el sistema";
+            lblEstado.Visible = true;
+            btnCerrar.Visible = true;
+
+            await Task.Delay(4000);
+            if (!popup.IsDisposed) { popup.Close(); popup.Dispose(); }
+        }
+    }
+}
