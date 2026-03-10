@@ -1,0 +1,96 @@
+﻿using System;
+using System.Drawing;
+using System.Windows.Forms;
+
+namespace InterfazParqueadero
+{
+    public partial class MantenimientoForm : Form
+    {
+        private static readonly Color ColorRojo = Color.FromArgb(231, 49, 55);
+        private static readonly Color ColorVerde = Color.FromArgb(40, 167, 69);
+        private static readonly Color ColorAzul = Color.FromArgb(10, 40, 116);
+        private static readonly Color ColorNaranja = Color.FromArgb(230, 100, 20);
+        private static readonly Color ColorGrisFondo = Color.FromArgb(245, 245, 245);
+
+        private bool EsMoto => rdMoto.Checked;
+
+        public MantenimientoForm()
+        {
+            InitializeComponent();
+        }
+
+        private void MantenimientoForm_Load(object? sender, EventArgs e)
+        {
+            ActualizarEstado();
+        }
+
+        private void RdTipo_CheckedChanged(object? sender, EventArgs e)
+        {
+            nudCantidad.Maximum = rdMoto.Checked
+                ? CapacidadService.CapacidadTotalMotos
+                : CapacidadService.CapacidadTotal;
+            ActualizarEstado();
+        }
+
+        private void ActualizarEstado()
+        {
+            if (EsMoto)
+            {
+                lblEstado.Text =
+                    $"🏍️  En mant.: {CapacidadService.MotosEnMantenimiento}  |  " +
+                    $"Disponibles: {CapacidadService.MotosDisponibles}  |  " +
+                    $"Total motos: {CapacidadService.CapacidadTotalMotos}";
+            }
+            else
+            {
+                lblEstado.Text =
+                    $"🚗  En mant.: {CapacidadService.EnMantenimiento}  |  " +
+                    $"Disponibles: {CapacidadService.Disponibles}  |  " +
+                    $"Total carros: {CapacidadService.CapacidadTotal}";
+            }
+        }
+
+        private void BtnPoner_Click(object? sender, EventArgs e)
+        {
+            int n = (int)nudCantidad.Value;
+            bool ok = CapacidadService.AgregarMantenimiento(n, EsMoto);
+            if (!ok)
+            {
+                int disp = EsMoto ? CapacidadService.MotosDisponibles : CapacidadService.Disponibles;
+                MessageBox.Show(
+                    $"No hay suficientes espacios disponibles para enviar {n} a mantenimiento.\n" +
+                    $"Disponibles actualmente: {disp}",
+                    "Sin espacios disponibles",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
+            }
+            ActualizarEstado();
+            DialogResult = DialogResult.OK;
+        }
+
+        private void InitializeComponent()
+        {
+
+        }
+
+        private void BtnHabilitar_Click(object? sender, EventArgs e)
+        {
+            int n = (int)nudCantidad.Value;
+            bool ok = CapacidadService.QuitarMantenimiento(n, EsMoto);
+            if (!ok)
+            {
+                int enMant = EsMoto ? CapacidadService.MotosEnMantenimiento : CapacidadService.EnMantenimiento;
+                MessageBox.Show(
+                    $"No hay espacios suficientes en mantenimiento para habilitar {n}.\n" +
+                    $"En mantenimiento actualmente: {enMant}",
+                    "Sin espacios en mantenimiento",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
+            }
+            ActualizarEstado();
+            DialogResult = DialogResult.OK;
+        }
+    }
+}

@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\chanc\\Downloads\\InterfazParqueadero_2_BETO\\InterfazParqueadero_2\\InterfazParqueadero.csproj": {}
+    "C:\\Users\\chanc\\OneDrive\\Escritorio\\Proyecto_extracurricular_parqueadero\\InterfazParqueadero_CON_DB\\InterfazParqueadero_2\\InterfazParqueadero.csproj": {}
   },
   "projects": {
-    "C:\\Users\\chanc\\Downloads\\InterfazParqueadero_2_BETO\\InterfazParqueadero_2\\InterfazParqueadero.csproj": {
+    "C:\\Users\\chanc\\OneDrive\\Escritorio\\Proyecto_extracurricular_parqueadero\\InterfazParqueadero_CON_DB\\InterfazParqueadero_2\\InterfazParqueadero.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\chanc\\Downloads\\InterfazParqueadero_2_BETO\\InterfazParqueadero_2\\InterfazParqueadero.csproj",
+        "projectUniqueName": "C:\\Users\\chanc\\OneDrive\\Escritorio\\Proyecto_extracurricular_parqueadero\\InterfazParqueadero_CON_DB\\InterfazParqueadero_2\\InterfazParqueadero.csproj",
         "projectName": "InterfazParqueadero",
-        "projectPath": "C:\\Users\\chanc\\Downloads\\InterfazParqueadero_2_BETO\\InterfazParqueadero_2\\InterfazParqueadero.csproj",
+        "projectPath": "C:\\Users\\chanc\\OneDrive\\Escritorio\\Proyecto_extracurricular_parqueadero\\InterfazParqueadero_CON_DB\\InterfazParqueadero_2\\InterfazParqueadero.csproj",
         "packagesPath": "C:\\Users\\chanc\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\chanc\\Downloads\\InterfazParqueadero_2_BETO\\InterfazParqueadero_2\\obj\\",
+        "outputPath": "C:\\Users\\chanc\\OneDrive\\Escritorio\\Proyecto_extracurricular_parqueadero\\InterfazParqueadero_CON_DB\\InterfazParqueadero_2\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -49,6 +49,16 @@
       "frameworks": {
         "net10.0-windows7.0": {
           "targetAlias": "net10.0-windows",
+          "dependencies": {
+            "ClosedXML": {
+              "target": "Package",
+              "version": "[0.102.3, )"
+            },
+            "Microsoft.Data.SqlClient": {
+              "target": "Package",
+              "version": "[5.2.2, )"
+            }
+          },
           "imports": [
             "net461",
             "net462",

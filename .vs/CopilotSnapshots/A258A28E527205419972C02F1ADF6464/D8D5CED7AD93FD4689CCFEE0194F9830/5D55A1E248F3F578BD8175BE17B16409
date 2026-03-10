@@ -1,0 +1,1150 @@
+﻿namespace InterfazParqueadero
+{
+    partial class Form1
+    {
+        private System.ComponentModel.IContainer components = null;
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && (components != null)) components.Dispose();
+            base.Dispose(disposing);
+        }
+
+        #region Windows Form Designer generated code
+
+        private void InitializeComponent()
+        {
+            // ═══════════════════════════════════════════════════════════
+            // PALETA PUCESA — Regla 60-30-10 (Blancos y Azules)
+            // 60% → Blanco / Gris muy claro (fondos)
+            // 30% → Azules institucionales (sidebar, header, botones)
+            // 10% → Acentos (verde, dorado, rojo para estados)
+            // ═══════════════════════════════════════════════════════════
+            Color azulOscuro   = Color.FromArgb(0, 51, 102);       // #003366 PUCESA oscuro
+            Color azulInst     = Color.FromArgb(0, 82, 165);       // #0052A5 azul institucional
+            Color azulAccent   = Color.FromArgb(74, 144, 217);     // #4A90D9 azul claro
+            Color azulSidebar  = Color.FromArgb(0, 40, 85);        // #002855 sidebar
+            Color azulHover    = Color.FromArgb(0, 60, 120);       // hover sidebar
+            Color blanco       = Color.White;
+            Color fondoClaro   = Color.FromArgb(245, 247, 250);    // #F5F7FA
+            Color textoOscuro  = Color.FromArgb(26, 35, 50);       // #1A2332
+            Color verdeEsm     = Color.FromArgb(40, 167, 69);      // #28A745
+            Color rojoSuave    = Color.FromArgb(220, 53, 69);      // #DC3545
+            Color dorado       = Color.FromArgb(255, 193, 7);      // #FFC107
+            Color grisBorde    = Color.FromArgb(222, 226, 230);
+            Color grisClaro    = Color.FromArgb(233, 236, 239);
+
+            // ═══════════════════════════════════════════════════════════
+            // INSTANCIACIÓN DE CONTROLES
+            // ═══════════════════════════════════════════════════════════
+            panelSuperior      = new Panel();
+            pictureBoxLogo     = new PictureBox();
+            lblTitulo          = new Label();
+            lblSubtitulo       = new Label();
+            lblRolUsuario      = new Label();
+            lblNombreOperador  = new Label();
+            panelEstado        = new Panel();
+            lblEstado          = new Label();
+            btnCerrarSesion    = new Button();
+            btnSalir           = new Button();
+
+            // Sidebar
+            panelSidebar       = new Panel();
+            btnNavDashboard    = new Button();
+            btnNavMapaParking  = new Button();
+            btnNavRegistroTags = new Button();
+            btnNavIncidencias  = new Button();
+            btnNavAuditoria    = new Button();
+            btnNavConfiguracion = new Button();
+            lblSidebarTitulo   = new Label();
+            lblSidebarUsuario  = new Label();
+            lblSidebarGarita   = new Label();
+
+            // Contenido principal
+            panelContenido     = new Panel();
+            panelPagDashboard  = new Panel();
+            panelPagIncidencias = new Panel();
+            panelPagAuditoria  = new Panel();
+            panelPagConfiguracion = new Panel();
+
+            // Dashboard
+            panelConfiguracion = new GroupBox();
+            lblIP              = new Label();
+            txtIP              = new TextBox();
+            lblPuerto          = new Label();
+            txtPuerto          = new TextBox();
+            lblTimeout         = new Label();
+            txtTimeout         = new TextBox();
+            btnConectar        = new Button();
+
+            panelEstadoBarrera = new GroupBox();
+            panelLedArriba     = new Panel();
+            lblIndicadorArriba = new Label();
+            panelLedAbajo      = new Panel();
+            lblIndicadorAbajo  = new Label();
+
+            panelSnapshot      = new Panel();
+            lblSnapshotTitulo  = new Label();
+            pictureBoxUsuario  = new PictureBox();
+            lblTagID           = new Label();
+            lblNombreUsuario   = new Label();
+            lblPlacaVehiculo   = new Label();
+            lblTipoUsuario     = new Label();
+            lblFacultad        = new Label();
+
+            panelControl       = new GroupBox();
+            btnLevantar        = new Button();
+            btnBajar           = new Button();
+            btnResetearSistema = new Button();
+            btnTicketVisitante = new Button();
+
+            // Panel acceso visual (reemplaza logs)
+            panelAccesoVisual  = new GroupBox();
+            panelUltimoAcceso  = new Panel();
+            lblAccesoTitulo    = new Label();
+            lblAccesoNombre    = new Label();
+            lblAccesoPlaca     = new Label();
+            lblAccesoTipo      = new Label();
+            lblAccesoHora      = new Label();
+            lblAccesoDireccion = new Label();
+            pictureBoxAcceso   = new PictureBox();
+            panelHistorialAccesos = new Panel();
+
+            // Incidencias
+            dgvIncidencias     = new DataGridView();
+            gbRegistroManual   = new GroupBox();
+            txtIncidenciaManual = new TextBox();
+            btnRegistrarIncidencia = new Button();
+            btnExportar        = new Button();
+            btnImportar        = new Button();
+
+            // Auditoría
+            dgvAuditoria       = new DataGridView();
+            gbFiltrosAuditoria = new GroupBox();
+            cmbFiltrosRegistros = new ComboBox();
+            lblDesde = new Label();
+            dtpDesde = new DateTimePicker();
+            lblHasta = new Label();
+            dtpHasta = new DateTimePicker();
+            btnFiltrar = new Button();
+            btnLimpiarFiltro = new Button();
+            btnExportarAuditoria = new Button();
+
+            // StatusBar
+            statusStrip          = new StatusStrip();
+            toolStripStatusLabel = new ToolStripStatusLabel();
+            toolStripStatusLabelHora = new ToolStripStatusLabel();
+
+            // ═══════════════════════════════════════════════════════════
+            // SUSPEND LAYOUT
+            // ═══════════════════════════════════════════════════════════
+            panelSuperior.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)pictureBoxLogo).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)pictureBoxUsuario).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)pictureBoxAcceso).BeginInit();
+            panelSidebar.SuspendLayout();
+            panelContenido.SuspendLayout();
+            panelPagDashboard.SuspendLayout();
+            panelPagIncidencias.SuspendLayout();
+            panelPagAuditoria.SuspendLayout();
+            panelConfiguracion.SuspendLayout();
+            panelEstadoBarrera.SuspendLayout();
+            panelSnapshot.SuspendLayout();
+            panelControl.SuspendLayout();
+            panelAccesoVisual.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)dgvIncidencias).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)dgvAuditoria).BeginInit();
+            statusStrip.SuspendLayout();
+            SuspendLayout();
+
+            // ═══════════════════════════════════════════════════════════
+            // HEADER — panelSuperior
+            // ═══════════════════════════════════════════════════════════
+            panelSuperior.BackColor = azulOscuro;
+            panelSuperior.Dock = DockStyle.Top;
+            panelSuperior.Size = new Size(1380, 64);
+            panelSuperior.Controls.Add(pictureBoxLogo);
+            panelSuperior.Controls.Add(lblTitulo);
+            panelSuperior.Controls.Add(lblSubtitulo);
+            panelSuperior.Controls.Add(panelEstado);
+            panelSuperior.Controls.Add(lblEstado);
+            panelSuperior.Paint += PanelSuperior_Paint;
+
+            // pictureBoxLogo
+            pictureBoxLogo.BackColor = Color.Transparent;
+            pictureBoxLogo.Location = new Point(14, 8);
+            pictureBoxLogo.Size = new Size(46, 46);
+            pictureBoxLogo.SizeMode = PictureBoxSizeMode.Zoom;
+            pictureBoxLogo.Cursor = Cursors.Hand;
+            pictureBoxLogo.TabStop = false;
+            pictureBoxLogo.Click += PictureBoxLogo_Click;
+
+            // lblTitulo
+            lblTitulo.AutoSize = true;
+            lblTitulo.Font = new Font("Segoe UI", 13f, FontStyle.Bold);
+            lblTitulo.ForeColor = blanco;
+            lblTitulo.Location = new Point(68, 8);
+            lblTitulo.Text = "PUCESA — Control de Parqueadero";
+
+            // lblSubtitulo
+            lblSubtitulo.AutoSize = true;
+            lblSubtitulo.Font = new Font("Segoe UI", 8.5f);
+            lblSubtitulo.ForeColor = Color.FromArgb(180, 210, 240);
+            lblSubtitulo.Location = new Point(70, 34);
+            lblSubtitulo.Text = "Control de Acceso Vehicular  •  ZKTeco InBIO 206";
+
+            // lblRolUsuario (oculto — info movida)
+            lblRolUsuario.Visible = false;
+            lblRolUsuario.AutoSize = true;
+            lblRolUsuario.Text = "";
+
+            // lblNombreOperador (oculto — info movida)
+            lblNombreOperador.Visible = false;
+            lblNombreOperador.AutoSize = true;
+            lblNombreOperador.Text = "";
+
+            // panelEstado — indicador LED alineado a la derecha
+            panelEstado.BackColor = Color.FromArgb(149, 165, 166);
+            panelEstado.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            panelEstado.Size = new Size(14, 14);
+            panelEstado.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                using SolidBrush b = new SolidBrush(panelEstado.BackColor);
+                e.Graphics.Clear(panelSuperior.BackColor);
+                e.Graphics.FillEllipse(b, 0, 0, 13, 13);
+            };
+
+            // lblEstado — al lado derecho del indicador
+            lblEstado.AutoSize = true;
+            lblEstado.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
+            lblEstado.ForeColor = Color.FromArgb(200, 220, 240);
+            lblEstado.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            lblEstado.Text = "InBIO: DESCONECTADO";
+
+            // Posicionar estado dinámicamente a la derecha del header
+            panelSuperior.Resize += (s, e) =>
+            {
+                int margenDerecho = 20;
+                lblEstado.Location = new Point(panelSuperior.Width - lblEstado.Width - margenDerecho, 25);
+                panelEstado.Location = new Point(lblEstado.Left - 22, 26);
+            };
+
+            // btnCerrarSesion — movido al sidebar (se configura abajo)
+            btnCerrarSesion.FlatStyle = FlatStyle.Flat;
+            btnCerrarSesion.Font = new Font("Segoe UI", 9f, FontStyle.Bold);
+            btnCerrarSesion.ForeColor = Color.FromArgb(220, 230, 240);
+            btnCerrarSesion.BackColor = Color.FromArgb(140, 40, 50);
+            btnCerrarSesion.FlatAppearance.BorderSize = 0;
+            btnCerrarSesion.FlatAppearance.MouseOverBackColor = Color.FromArgb(180, 50, 60);
+            btnCerrarSesion.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
+            btnCerrarSesion.Location = new Point(0, 0);
+            btnCerrarSesion.Size = new Size(240, 52);
+            btnCerrarSesion.Text = "🔒  Cerrar Sesión";
+            btnCerrarSesion.TextAlign = ContentAlignment.MiddleLeft;
+            btnCerrarSesion.Padding = new Padding(16, 0, 0, 0);
+            btnCerrarSesion.Cursor = Cursors.Hand;
+            btnCerrarSesion.Click += BtnCerrarSesion_Click;
+
+            // btnSalir — oculto (se usa el cierre nativo del formulario)
+            btnSalir.Visible = false;
+            btnSalir.Size = new Size(0, 0);
+
+            // ═══════════════════════════════════════════════════════════
+            // SIDEBAR — Navegación lateral (rediseño atractivo)
+            // ═══════════════════════════════════════════════════════════
+            panelSidebar.BackColor = azulSidebar;
+            panelSidebar.Dock = DockStyle.Left;
+            panelSidebar.Width = 250;
+            panelSidebar.Controls.Add(lblSidebarTitulo);
+            panelSidebar.Controls.Add(lblSidebarUsuario);
+            panelSidebar.Controls.Add(lblSidebarGarita);
+            panelSidebar.Controls.Add(btnNavDashboard);
+            panelSidebar.Controls.Add(btnNavMapaParking);
+            panelSidebar.Controls.Add(btnNavRegistroTags);
+            panelSidebar.Controls.Add(btnNavIncidencias);
+            panelSidebar.Controls.Add(btnNavAuditoria);
+            panelSidebar.Controls.Add(btnTicketVisitante);
+            panelSidebar.Controls.Add(btnNavConfiguracion);
+            panelSidebar.Controls.Add(btnCerrarSesion);
+
+            // ── SIDEBAR — Fondo premium con categorías ──
+            // Layout (Y): Título 0-44 | OPERACIONES 48-68 | Dashboard 68-110 | MapaParking 110-152 |
+            //   REGISTROS 160-180 | RegTags 180-222 | Incidencias 222-264 |
+            //   REPORTES 272-292 | Auditoría 292-334 | Tickets 334-376
+            panelSidebar.Paint += (s, e) =>
+            {
+                var g = e.Graphics;
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+                int w = panelSidebar.Width;
+                int h = panelSidebar.Height;
+
+                // Gradiente vertical premium
+                using var gradBrush = new System.Drawing.Drawing2D.LinearGradientBrush(
+                    new Point(0, 0), new Point(0, h),
+                    Color.FromArgb(8, 28, 60), Color.FromArgb(12, 42, 85));
+                g.FillRectangle(gradBrush, panelSidebar.ClientRectangle);
+
+                // Línea derecha acento
+                using var accentPen = new Pen(Color.FromArgb(30, 100, 180, 255), 1);
+                g.DrawLine(accentPen, w - 1, 0, w - 1, h);
+
+                // ── Separador debajo del título ──
+                using var sepGrad = new System.Drawing.Drawing2D.LinearGradientBrush(
+                    new Point(15, 0), new Point(235, 0),
+                    Color.FromArgb(70, 100, 180, 255), Color.FromArgb(0, 100, 180, 255));
+                g.FillRectangle(sepGrad, 15, 44, 220, 1);
+
+                // ── Separador debajo de info usuario ──
+                using var sepUser = new System.Drawing.Drawing2D.LinearGradientBrush(
+                    new Point(15, 0), new Point(235, 0),
+                    Color.FromArgb(50, 100, 180, 255), Color.FromArgb(0, 100, 180, 255));
+                g.FillRectangle(sepUser, 15, 98, 220, 1);
+
+                // ── Categorías — Fondo tinted + texto + barra lateral ──
+                using var catFont = new Font("Segoe UI", 7.5f, FontStyle.Bold);
+                using var catBrush = new SolidBrush(Color.FromArgb(120, 175, 235));
+                using var catBg = new SolidBrush(Color.FromArgb(12, 255, 255, 255));
+                using var catBar = new SolidBrush(Color.FromArgb(74, 144, 217));
+
+
+                // ── Separador antes de Cerrar Sesión ──
+                int sepY = h - 56;
+                using var bottomSep = new System.Drawing.Drawing2D.LinearGradientBrush(
+                    new Point(15, 0), new Point(235, 0),
+                    Color.FromArgb(50, 200, 80, 80), Color.FromArgb(0, 200, 80, 80));
+                g.FillRectangle(bottomSep, 15, sepY, 220, 1);
+            };
+
+            // Título sidebar
+            lblSidebarTitulo.Text = "   ☰  MENÚ";
+            lblSidebarTitulo.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
+            lblSidebarTitulo.ForeColor = Color.FromArgb(140, 190, 240);
+            lblSidebarTitulo.Location = new Point(16, 14);
+            lblSidebarTitulo.AutoSize = true;
+            lblSidebarTitulo.BackColor = Color.Transparent;
+
+            // Info usuario en sidebar
+            lblSidebarUsuario.Text = "👤  Operador";
+            lblSidebarUsuario.Font = new Font("Segoe UI", 10f, FontStyle.Bold);
+            lblSidebarUsuario.ForeColor = Color.White;
+            lblSidebarUsuario.Location = new Point(20, 52);
+            lblSidebarUsuario.AutoSize = true;
+            lblSidebarUsuario.BackColor = Color.Transparent;
+
+            lblSidebarGarita.Text = "📍  Garita";
+            lblSidebarGarita.Font = new Font("Segoe UI", 8.5f);
+            lblSidebarGarita.ForeColor = Color.FromArgb(140, 190, 240);
+            lblSidebarGarita.Location = new Point(20, 74);
+            lblSidebarGarita.AutoSize = true;
+            lblSidebarGarita.BackColor = Color.Transparent;
+
+            // Colores sidebar
+            Color sidebarItemHover  = Color.FromArgb(15, 55, 110);
+            Color sidebarItemPress  = Color.FromArgb(20, 70, 135);
+            Color sidebarTextNormal = Color.FromArgb(175, 200, 230);
+
+            void ConfigSidebarBtn(Button btn, string text, int yPos)
+            {
+                btn.FlatStyle = FlatStyle.Flat;
+                btn.FlatAppearance.BorderSize = 0;
+                btn.FlatAppearance.MouseOverBackColor = sidebarItemHover;
+                btn.FlatAppearance.MouseDownBackColor = sidebarItemPress;
+                btn.Font = new Font("Segoe UI", 10f);
+                btn.ForeColor = sidebarTextNormal;
+                btn.BackColor = Color.Transparent;
+                btn.TextAlign = ContentAlignment.MiddleLeft;
+                btn.Padding = new Padding(22, 0, 0, 0);
+                btn.Location = new Point(0, yPos);
+                btn.Size = new Size(250, 42);
+                btn.Text = text;
+                btn.Cursor = Cursors.Hand;
+
+                btn.MouseEnter += (s, e) =>
+                {
+                    if (btn.Tag?.ToString() != "active")
+                    {
+                        btn.ForeColor = Color.FromArgb(235, 245, 255);
+                        btn.BackColor = Color.FromArgb(12, 48, 98);
+                    }
+                };
+                btn.MouseLeave += (s, e) =>
+                {
+                    if (btn.Tag?.ToString() != "active")
+                    {
+                        btn.ForeColor = sidebarTextNormal;
+                        btn.BackColor = Color.Transparent;
+                    }
+                };
+
+                // Barra indicadora activa
+                btn.Paint += (s, e) =>
+                {
+                    if (btn.Tag?.ToString() == "active")
+                    {
+                        using SolidBrush barBrush = new SolidBrush(Color.FromArgb(40, 167, 69));
+                        e.Graphics.FillRectangle(barBrush, 0, 4, 4, btn.Height - 8);
+                        using var glowBrush = new SolidBrush(Color.FromArgb(15, 40, 167, 69));
+                        e.Graphics.FillRectangle(glowBrush, 4, 0, 10, btn.Height);
+                    }
+                };
+            }
+
+            // OPERACIONES
+            ConfigSidebarBtn(btnNavDashboard,    "📊  Dashboard",        108);
+            ConfigSidebarBtn(btnNavMapaParking,  "🔧  Mantenimiento",   150);
+
+            // GESTIÓN
+            ConfigSidebarBtn(btnNavRegistroTags, "🏷  Tags",              192);
+            ConfigSidebarBtn(btnNavIncidencias,  "📋  Incidencias",      234);
+
+            // REPORTES
+            ConfigSidebarBtn(btnNavAuditoria,    "📝  Registros",        276);
+            ConfigSidebarBtn(btnTicketVisitante, "🎫  Tickets Visita",   318);
+
+            // SISTEMA
+            ConfigSidebarBtn(btnNavConfiguracion, "⚙  Configuración",    360);
+
+            btnNavDashboard.Click    += BtnNavDashboard_Click;
+            btnNavMapaParking.Click  += BtnNavMapaParking_Click;
+            btnNavRegistroTags.Click += BtnNavRegistroTags_Click;
+            btnNavIncidencias.Click  += BtnNavIncidencias_Click;
+            btnNavAuditoria.Click    += BtnNavAuditoria_Click;
+            btnNavConfiguracion.Click += BtnNavConfiguracion_Click;
+            btnTicketVisitante.Click += BtnTicketVisitante_Click;
+
+            // Dashboard activo por defecto
+            btnNavDashboard.Tag = "active";
+            btnNavDashboard.BackColor = Color.FromArgb(18, 60, 120);
+            btnNavDashboard.ForeColor = Color.White;
+            btnNavDashboard.Font = new Font("Segoe UI", 10f, FontStyle.Bold);
+
+            // Cerrar sesión
+            btnCerrarSesion.ForeColor = Color.FromArgb(245, 245, 245);
+            btnCerrarSesion.BackColor = Color.FromArgb(110, 30, 40);
+            btnCerrarSesion.Size = new Size(250, 50);
+            btnCerrarSesion.FlatAppearance.MouseOverBackColor = Color.FromArgb(155, 45, 55);
+            btnCerrarSesion.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
+            btnCerrarSesion.Text = "🔒  Cerrar Sesión";
+            btnCerrarSesion.TextAlign = ContentAlignment.MiddleLeft;
+            btnCerrarSesion.Padding = new Padding(20, 0, 0, 0);
+
+            // Posicionar btnCerrarSesion al fondo del sidebar
+            panelSidebar.Resize += (s, e) =>
+            {
+                btnCerrarSesion.Location = new Point(0, panelSidebar.Height - 50);
+                panelSidebar.Invalidate();
+            };
+            btnCerrarSesion.Location = new Point(0, panelSidebar.Height - 50);
+
+            // ═══════════════════════════════════════════════════════════
+            // CONTENIDO PRINCIPAL
+            // ═══════════════════════════════════════════════════════════
+            panelContenido.Dock = DockStyle.Fill;
+            panelContenido.BackColor = fondoClaro;
+            panelContenido.Padding = new Padding(0);
+            panelContenido.Controls.Add(panelPagDashboard);
+            panelContenido.Controls.Add(panelPagIncidencias);
+            panelContenido.Controls.Add(panelPagAuditoria);
+            panelContenido.Controls.Add(panelPagConfiguracion);
+
+            // Página Dashboard (sin panel de conexión)
+            panelPagDashboard.Dock = DockStyle.Fill;
+            panelPagDashboard.BackColor = fondoClaro;
+            panelPagDashboard.AutoScroll = true;
+            panelPagDashboard.Padding = new Padding(16);
+            panelPagDashboard.Controls.Add(panelEstadoBarrera);
+            panelPagDashboard.Controls.Add(panelControl);
+            panelPagDashboard.Controls.Add(panelAccesoVisual);
+            panelPagDashboard.Visible = true;
+
+            // panelSnapshot oculto (eliminado del dashboard)
+            panelSnapshot.Visible = false;
+            panelSnapshot.Size = new Size(0, 0);
+
+            // Página Configuración (con panel de conexión)
+            panelPagConfiguracion.Dock = DockStyle.Fill;
+            panelPagConfiguracion.BackColor = fondoClaro;
+            panelPagConfiguracion.Padding = new Padding(16);
+            panelPagConfiguracion.Controls.Add(panelConfiguracion);
+            panelPagConfiguracion.Visible = false;
+
+            // Página Incidencias
+            panelPagIncidencias.Dock = DockStyle.Fill;
+            panelPagIncidencias.BackColor = fondoClaro;
+            panelPagIncidencias.Padding = new Padding(16);
+            panelPagIncidencias.Controls.Add(gbRegistroManual);
+            panelPagIncidencias.Controls.Add(dgvIncidencias);
+            panelPagIncidencias.Controls.Add(btnExportar);
+            panelPagIncidencias.Controls.Add(btnImportar);
+            panelPagIncidencias.Visible = false;
+
+            // Página Ingresos/Salidas
+            panelPagAuditoria.Dock = DockStyle.Fill;
+            panelPagAuditoria.BackColor = fondoClaro;
+            panelPagAuditoria.Padding = new Padding(16);
+            panelPagAuditoria.Controls.Add(gbFiltrosAuditoria);
+            panelPagAuditoria.Controls.Add(dgvAuditoria);
+            panelPagAuditoria.Controls.Add(btnExportarAuditoria);
+            panelPagAuditoria.Visible = false;
+
+            // ═══════════════════════════════════════════════════════════
+            // DASHBOARD — Configuración de Conexión
+            // ═══════════════════════════════════════════════════════════
+            panelConfiguracion.Location = new Point(20, 20);
+            panelConfiguracion.Size = new Size(1060, 80);
+            panelConfiguracion.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            panelConfiguracion.Font = new Font("Segoe UI", 9f, FontStyle.Bold);
+            panelConfiguracion.ForeColor = azulInst;
+            panelConfiguracion.BackColor = blanco;
+            panelConfiguracion.Text = "  Conexión InBIO 206  ";
+            panelConfiguracion.FlatStyle = FlatStyle.Flat;
+            panelConfiguracion.Controls.Add(lblIP);
+            panelConfiguracion.Controls.Add(txtIP);
+            panelConfiguracion.Controls.Add(lblPuerto);
+            panelConfiguracion.Controls.Add(txtPuerto);
+            panelConfiguracion.Controls.Add(lblTimeout);
+            panelConfiguracion.Controls.Add(txtTimeout);
+            panelConfiguracion.Controls.Add(btnConectar);
+
+            lblIP.Text = "IP:";
+            lblIP.Font = new Font("Segoe UI", 9f);
+            lblIP.ForeColor = textoOscuro;
+            lblIP.Location = new Point(18, 30);
+            lblIP.AutoSize = true;
+
+            txtIP.Font = new Font("Segoe UI", 10f);
+            txtIP.Location = new Point(40, 27);
+            txtIP.Size = new Size(180, 28);
+            txtIP.BorderStyle = BorderStyle.FixedSingle;
+
+            lblPuerto.Text = "Puerto:";
+            lblPuerto.Font = new Font("Segoe UI", 9f);
+            lblPuerto.ForeColor = textoOscuro;
+            lblPuerto.Location = new Point(235, 30);
+            lblPuerto.AutoSize = true;
+
+            txtPuerto.Font = new Font("Segoe UI", 10f);
+            txtPuerto.Location = new Point(290, 27);
+            txtPuerto.Size = new Size(75, 28);
+            txtPuerto.BorderStyle = BorderStyle.FixedSingle;
+
+            lblTimeout.Text = "Timeout:";
+            lblTimeout.Font = new Font("Segoe UI", 9f);
+            lblTimeout.ForeColor = textoOscuro;
+            lblTimeout.Location = new Point(380, 30);
+            lblTimeout.AutoSize = true;
+
+            txtTimeout.Font = new Font("Segoe UI", 10f);
+            txtTimeout.Location = new Point(445, 27);
+            txtTimeout.Size = new Size(75, 28);
+            txtTimeout.BorderStyle = BorderStyle.FixedSingle;
+
+            btnConectar.FlatStyle = FlatStyle.Flat;
+            btnConectar.Font = new Font("Segoe UI", 10f, FontStyle.Bold);
+            btnConectar.ForeColor = blanco;
+            btnConectar.BackColor = azulAccent;
+            btnConectar.FlatAppearance.BorderSize = 0;
+            btnConectar.Location = new Point(550, 22);
+            btnConectar.Size = new Size(160, 36);
+            btnConectar.Text = "CONECTAR";
+            btnConectar.Cursor = Cursors.Hand;
+            btnConectar.Click += BtnConectar_Click;
+
+            // ═══════════════════════════════════════════════════════════
+            // DASHBOARD — Estado Barrera (LED compactos)
+            // ═══════════════════════════════════════════════════════════
+            panelEstadoBarrera.Location = new Point(20, 10);
+            panelEstadoBarrera.Size = new Size(1060, 76);
+            panelEstadoBarrera.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            panelEstadoBarrera.Font = new Font("Segoe UI", 10f, FontStyle.Bold);
+            panelEstadoBarrera.ForeColor = azulInst;
+            panelEstadoBarrera.BackColor = blanco;
+            panelEstadoBarrera.Text = "  Estado de la Barrera  ";
+            panelEstadoBarrera.FlatStyle = FlatStyle.Flat;
+            panelEstadoBarrera.Controls.Add(panelLedArriba);
+            panelEstadoBarrera.Controls.Add(lblIndicadorArriba);
+            panelEstadoBarrera.Controls.Add(panelLedAbajo);
+            panelEstadoBarrera.Controls.Add(lblIndicadorAbajo);
+
+            panelLedArriba.Size = new Size(20, 20);
+            panelLedArriba.Location = new Point(30, 34);
+            panelLedArriba.BackColor = grisClaro;
+            panelLedArriba.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                using SolidBrush b = new SolidBrush(panelLedArriba.BackColor);
+                e.Graphics.Clear(blanco);
+                e.Graphics.FillEllipse(b, 1, 1, 17, 17);
+            };
+
+            lblIndicadorArriba.AutoSize = false;
+            lblIndicadorArriba.BackColor = blanco;
+            lblIndicadorArriba.Font = new Font("Segoe UI", 10f, FontStyle.Bold);
+            lblIndicadorArriba.ForeColor = Color.FromArgb(150, 155, 160);
+            lblIndicadorArriba.Location = new Point(58, 32);
+            lblIndicadorArriba.Size = new Size(220, 24);
+            lblIndicadorArriba.Text = "⬆  BARRERA ARRIBA";
+            lblIndicadorArriba.TextAlign = ContentAlignment.MiddleLeft;
+
+            panelLedAbajo.Size = new Size(20, 20);
+            panelLedAbajo.Location = new Point(350, 34);
+            panelLedAbajo.BackColor = grisClaro;
+            panelLedAbajo.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                using SolidBrush b = new SolidBrush(panelLedAbajo.BackColor);
+                e.Graphics.Clear(blanco);
+                e.Graphics.FillEllipse(b, 1, 1, 17, 17);
+            };
+
+            lblIndicadorAbajo.AutoSize = false;
+            lblIndicadorAbajo.BackColor = blanco;
+            lblIndicadorAbajo.Font = new Font("Segoe UI", 10f, FontStyle.Bold);
+            lblIndicadorAbajo.ForeColor = Color.FromArgb(150, 155, 160);
+            lblIndicadorAbajo.Location = new Point(378, 32);
+            lblIndicadorAbajo.Size = new Size(220, 24);
+            lblIndicadorAbajo.Text = "⬇  BARRERA ABAJO";
+            lblIndicadorAbajo.TextAlign = ContentAlignment.MiddleLeft;
+
+            // ═══════════════════════════════════════════════════════════
+            // DASHBOARD — Snapshot de Acceso (expandido visual)
+            // ═══════════════════════════════════════════════════════════
+            panelSnapshot.Location = new Point(555, 88);
+            panelSnapshot.Size = new Size(525, 65);
+            panelSnapshot.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            panelSnapshot.BackColor = blanco;
+            panelSnapshot.Controls.Add(lblSnapshotTitulo);
+            panelSnapshot.Controls.Add(pictureBoxUsuario);
+            panelSnapshot.Controls.Add(lblTagID);
+            panelSnapshot.Controls.Add(lblNombreUsuario);
+            panelSnapshot.Controls.Add(lblPlacaVehiculo);
+            panelSnapshot.Controls.Add(lblTipoUsuario);
+            panelSnapshot.Controls.Add(lblFacultad);
+            panelSnapshot.Paint += (s, e) =>
+            {
+                using Pen pen = new Pen(grisBorde, 1);
+                e.Graphics.DrawRectangle(pen, 0, 0, panelSnapshot.Width - 1, panelSnapshot.Height - 1);
+            };
+
+            lblSnapshotTitulo.Font = new Font("Segoe UI", 9f, FontStyle.Bold);
+            lblSnapshotTitulo.ForeColor = Color.FromArgb(149, 165, 166);
+            lblSnapshotTitulo.Location = new Point(10, 6);
+            lblSnapshotTitulo.AutoSize = true;
+            lblSnapshotTitulo.Text = "Esperando detección...";
+
+            pictureBoxUsuario.Location = new Point(10, 26);
+            pictureBoxUsuario.Size = new Size(32, 32);
+            pictureBoxUsuario.SizeMode = PictureBoxSizeMode.Zoom;
+            pictureBoxUsuario.BackColor = Color.FromArgb(245, 247, 250);
+            pictureBoxUsuario.TabStop = false;
+
+            lblTagID.Font = new Font("Segoe UI", 8f);
+            lblTagID.ForeColor = Color.FromArgb(127, 140, 141);
+            lblTagID.Location = new Point(48, 26);
+            lblTagID.AutoSize = true;
+            lblTagID.Text = "Tag: —";
+
+            lblNombreUsuario.Font = new Font("Segoe UI", 10f, FontStyle.Bold);
+            lblNombreUsuario.ForeColor = textoOscuro;
+            lblNombreUsuario.Location = new Point(48, 42);
+            lblNombreUsuario.Size = new Size(220, 20);
+            lblNombreUsuario.Text = "—";
+
+            lblPlacaVehiculo.Font = new Font("Segoe UI", 9f, FontStyle.Bold);
+            lblPlacaVehiculo.ForeColor = azulInst;
+            lblPlacaVehiculo.Location = new Point(300, 26);
+            lblPlacaVehiculo.AutoSize = true;
+            lblPlacaVehiculo.Text = "Placa: —";
+
+            lblTipoUsuario.Font = new Font("Segoe UI", 9f, FontStyle.Bold);
+            lblTipoUsuario.ForeColor = verdeEsm;
+            lblTipoUsuario.Location = new Point(300, 44);
+            lblTipoUsuario.AutoSize = true;
+            lblTipoUsuario.Text = "—";
+
+            lblFacultad.Font = new Font("Segoe UI", 8f);
+            lblFacultad.ForeColor = Color.FromArgb(127, 140, 141);
+            lblFacultad.Location = new Point(420, 44);
+            lblFacultad.AutoSize = true;
+            lblFacultad.Text = "";
+
+            // ═══════════════════════════════════════════════════════════
+            // DASHBOARD — Control Manual (botones compactos)
+            // ═══════════════════════════════════════════════════════════
+            panelControl.Location = new Point(20, 96);
+            panelControl.Size = new Size(1060, 86);
+            panelControl.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            panelControl.Font = new Font("Segoe UI", 9f, FontStyle.Bold);
+            panelControl.ForeColor = azulInst;
+            panelControl.BackColor = blanco;
+            panelControl.Text = "  Control Manual  ";
+            panelControl.FlatStyle = FlatStyle.Flat;
+            panelControl.Controls.Add(btnLevantar);
+            panelControl.Controls.Add(btnBajar);
+            panelControl.Controls.Add(btnResetearSistema);
+
+            void ConfigCtrlBtn(Button btn, string text, Color bg, int xPos)
+            {
+                btn.FlatStyle = FlatStyle.Flat;
+                btn.Font = new Font("Segoe UI", 10f, FontStyle.Bold);
+                btn.ForeColor = blanco;
+                btn.BackColor = bg;
+                btn.FlatAppearance.BorderSize = 0;
+                btn.Location = new Point(xPos, 24);
+                btn.Size = new Size(210, 48);
+                btn.Text = text;
+                btn.Cursor = Cursors.Hand;
+            }
+
+            ConfigCtrlBtn(btnLevantar,        "⬆ ABRIR BARRERA",    verdeEsm,    10);
+            ConfigCtrlBtn(btnBajar,            "⬇ CERRAR BARRERA",   rojoSuave,   228);
+            ConfigCtrlBtn(btnResetearSistema,  "🚨 RESETEAR",          dorado,      446);
+
+            btnResetearSistema.ForeColor = textoOscuro;
+
+            btnLevantar.Click        += BtnLevantar_Click;
+            btnBajar.Click           += BtnBajar_Click;
+            btnResetearSistema.Click += BtnResetearSistema_Dashboard_Click;
+
+            // Tooltips descriptivos para STOP y RESETEAR
+            ToolTip toolTip = new ToolTip
+            {
+                InitialDelay = 300,
+                AutoPopDelay = 8000,
+                ReshowDelay = 200,
+                IsBalloon = true
+            };
+
+            toolTip.SetToolTip(btnResetearSistema,
+                "🚨 RESETEAR SISTEMA\n\n" +
+                "Apaga TODOS los relés del InBIO y restaura\n" +
+                "el sistema a modo automático.\n" +
+                "Las barreras bajarán a su posición de reposo.\n" +
+                "Requiere confirmación antes de ejecutar.");
+            toolTip.SetToolTip(btnLevantar,
+                "⬆ ABRIR BARRERA\n\n" +
+                "Activa el relé LOCK1 para subir la barrera.\n" +
+                "La barrera se cerrará automáticamente\n" +
+                "después de 10 segundos.");
+            toolTip.SetToolTip(btnBajar,
+                "⬇ CERRAR BARRERA\n\n" +
+                "Activa el relé LOCK2 para bajar la barrera\n" +
+                "inmediatamente.");
+
+            // ═══════════════════════════════════════════════════════════
+            // DASHBOARD — Panel Acceso Visual (reemplaza logs)
+            // ═══════════════════════════════════════════════════════════
+            panelAccesoVisual.Location = new Point(20, 192);
+            panelAccesoVisual.Size = new Size(1060, 560);
+            panelAccesoVisual.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom;
+            panelAccesoVisual.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
+            panelAccesoVisual.ForeColor = azulInst;
+            panelAccesoVisual.BackColor = blanco;
+            panelAccesoVisual.Text = "  Acceso en Tiempo Real  ";
+            panelAccesoVisual.FlatStyle = FlatStyle.Flat;
+            panelAccesoVisual.Controls.Add(panelUltimoAcceso);
+            panelAccesoVisual.Controls.Add(panelHistorialAccesos);
+
+            // Último acceso — tarjeta grande
+            panelUltimoAcceso.Location = new Point(12, 28);
+            panelUltimoAcceso.Size = new Size(1035, 160);
+            panelUltimoAcceso.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            panelUltimoAcceso.BackColor = Color.FromArgb(240, 247, 255);
+            panelUltimoAcceso.Controls.Add(pictureBoxAcceso);
+            panelUltimoAcceso.Controls.Add(lblAccesoTitulo);
+            panelUltimoAcceso.Controls.Add(lblAccesoNombre);
+            panelUltimoAcceso.Controls.Add(lblAccesoPlaca);
+            panelUltimoAcceso.Controls.Add(lblAccesoTipo);
+            panelUltimoAcceso.Controls.Add(lblAccesoHora);
+            panelUltimoAcceso.Controls.Add(lblAccesoDireccion);
+            panelUltimoAcceso.Paint += (s, e) =>
+            {
+                using Pen pen = new Pen(Color.FromArgb(200, 220, 240), 1);
+                e.Graphics.DrawRectangle(pen, 0, 0, panelUltimoAcceso.Width - 1, panelUltimoAcceso.Height - 1);
+            };
+
+            pictureBoxAcceso.Location = new Point(20, 20);
+            pictureBoxAcceso.Size = new Size(100, 120);
+            pictureBoxAcceso.SizeMode = PictureBoxSizeMode.Zoom;
+            pictureBoxAcceso.BackColor = Color.FromArgb(230, 240, 250);
+            pictureBoxAcceso.TabStop = false;
+
+            lblAccesoTitulo.Text = "ÚLTIMO ACCESO";
+            lblAccesoTitulo.Font = new Font("Segoe UI", 10f, FontStyle.Bold);
+            lblAccesoTitulo.ForeColor = azulInst;
+            lblAccesoTitulo.Location = new Point(140, 12);
+            lblAccesoTitulo.AutoSize = true;
+
+            lblAccesoNombre.Text = "Esperando acceso vehicular...";
+            lblAccesoNombre.Font = new Font("Segoe UI", 16f, FontStyle.Bold);
+            lblAccesoNombre.ForeColor = textoOscuro;
+            lblAccesoNombre.Location = new Point(140, 38);
+            lblAccesoNombre.Size = new Size(500, 32);
+
+            lblAccesoPlaca.Text = "Placa: —";
+            lblAccesoPlaca.Font = new Font("Segoe UI", 14f, FontStyle.Bold);
+            lblAccesoPlaca.ForeColor = azulInst;
+            lblAccesoPlaca.Location = new Point(140, 75);
+            lblAccesoPlaca.AutoSize = true;
+
+            lblAccesoTipo.Text = "—";
+            lblAccesoTipo.Font = new Font("Segoe UI", 11f, FontStyle.Bold);
+            lblAccesoTipo.ForeColor = Color.FromArgb(149, 165, 166);
+            lblAccesoTipo.Location = new Point(140, 105);
+            lblAccesoTipo.AutoSize = true;
+
+            lblAccesoHora.Text = "";
+            lblAccesoHora.Font = new Font("Segoe UI", 24f, FontStyle.Bold);
+            lblAccesoHora.ForeColor = azulInst;
+            lblAccesoHora.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            lblAccesoHora.Location = new Point(750, 20);
+            lblAccesoHora.AutoSize = true;
+
+            lblAccesoDireccion.Text = "";
+            lblAccesoDireccion.Font = new Font("Segoe UI", 12f, FontStyle.Bold);
+            lblAccesoDireccion.ForeColor = verdeEsm;
+            lblAccesoDireccion.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            lblAccesoDireccion.Location = new Point(750, 62);
+            lblAccesoDireccion.AutoSize = true;
+
+            // Historial de accesos (lista visual)
+            panelHistorialAccesos.Location = new Point(12, 196);
+            panelHistorialAccesos.Size = new Size(1035, 274);
+            panelHistorialAccesos.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom;
+            panelHistorialAccesos.BackColor = blanco;
+            panelHistorialAccesos.AutoScroll = true;
+            panelHistorialAccesos.Paint += (s, e) =>
+            {
+                using Pen pen = new Pen(grisBorde, 1);
+                e.Graphics.DrawRectangle(pen, 0, 0, panelHistorialAccesos.Width - 1, panelHistorialAccesos.Height - 1);
+                using Font f = new Font("Segoe UI", 9f, FontStyle.Bold);
+                using SolidBrush b = new SolidBrush(Color.FromArgb(149, 165, 166));
+                e.Graphics.DrawString("HISTORIAL DE ACCESOS RECIENTES", f, b, 8, 4);
+            };
+
+            // ═══════════════════════════════════════════════════════════
+            // INCIDENCIAS — Toolbar arriba, DGV debajo
+            // ═══════════════════════════════════════════════════════════
+            btnExportar.FlatStyle = FlatStyle.Flat;
+            btnExportar.Font = new Font("Segoe UI", 10f, FontStyle.Bold);
+            btnExportar.ForeColor = blanco;
+            btnExportar.BackColor = verdeEsm;
+            btnExportar.FlatAppearance.BorderSize = 0;
+            btnExportar.Location = new Point(20, 14);
+            btnExportar.Size = new Size(200, 40);
+            btnExportar.Anchor = AnchorStyles.Top | AnchorStyles.Left;
+            btnExportar.Text = "📄  Exportar CSV";
+            btnExportar.Cursor = Cursors.Hand;
+            btnExportar.Click += BtnExportar_Click;
+
+            btnImportar.FlatStyle = FlatStyle.Flat;
+            btnImportar.Font = new Font("Segoe UI", 10f, FontStyle.Bold);
+            btnImportar.ForeColor = blanco;
+            btnImportar.BackColor = azulInst;
+            btnImportar.FlatAppearance.BorderSize = 0;
+            btnImportar.Location = new Point(230, 14);
+            btnImportar.Size = new Size(170, 40);
+            btnImportar.Anchor = AnchorStyles.Top | AnchorStyles.Left;
+            btnImportar.Text = "📥  Importar";
+            btnImportar.Cursor = Cursors.Hand;
+            btnImportar.Click += BtnImportar_Click;
+
+            // ═══════════════════════════════════════════════════════════
+            // INCIDENCIAS — Formulario Manual
+            // ═══════════════════════════════════════════════════════════
+            gbRegistroManual.Text = "  ▶ Registrar Incidencia Manual  ";
+            gbRegistroManual.Location = new Point(20, 64);
+            gbRegistroManual.Size = new Size(1040, 80);
+            gbRegistroManual.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            gbRegistroManual.Font = new Font("Segoe UI", 9f, FontStyle.Bold);
+            gbRegistroManual.ForeColor = azulInst;
+            gbRegistroManual.Controls.Add(txtIncidenciaManual);
+            gbRegistroManual.Controls.Add(btnRegistrarIncidencia);
+
+            txtIncidenciaManual.Location = new Point(20, 32);
+            txtIncidenciaManual.Size = new Size(800, 27);
+            txtIncidenciaManual.Font = new Font("Segoe UI", 10f);
+            txtIncidenciaManual.PlaceholderText = "Ej: Vehículo rayado en el Puesto 12...";
+            txtIncidenciaManual.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+
+            btnRegistrarIncidencia.FlatStyle = FlatStyle.Flat;
+            btnRegistrarIncidencia.Font = new Font("Segoe UI", 10f, FontStyle.Bold);
+            btnRegistrarIncidencia.ForeColor = blanco;
+            btnRegistrarIncidencia.BackColor = Color.FromArgb(230, 126, 34); // Naranja
+            btnRegistrarIncidencia.FlatAppearance.BorderSize = 0;
+            btnRegistrarIncidencia.Location = new Point(840, 26);
+            btnRegistrarIncidencia.Size = new Size(180, 40);
+            btnRegistrarIncidencia.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnRegistrarIncidencia.Text = "➕  REGISTRAR";
+            btnRegistrarIncidencia.Cursor = Cursors.Hand;
+            btnRegistrarIncidencia.Click += BtnRegistrarIncidencia_Click;
+
+            dgvIncidencias.Location = new Point(20, 160);
+            dgvIncidencias.Size = new Size(1040, 504);
+            dgvIncidencias.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom;
+
+            // ═══════════════════════════════════════════════════════════
+            // REGISTROS — Toolbar arriba, DGV debajo
+            // ═══════════════════════════════════════════════════════════
+            btnExportarAuditoria.FlatStyle = FlatStyle.Flat;
+            btnExportarAuditoria.Font = new Font("Segoe UI", 10f, FontStyle.Bold);
+            btnExportarAuditoria.ForeColor = blanco;
+            btnExportarAuditoria.BackColor = verdeEsm;
+            btnExportarAuditoria.FlatAppearance.BorderSize = 0;
+            btnExportarAuditoria.Location = new Point(20, 14);
+            btnExportarAuditoria.Size = new Size(230, 40);
+            btnExportarAuditoria.Anchor = AnchorStyles.Top | AnchorStyles.Left;
+            btnExportarAuditoria.Text = "📄  Exportar Registros";
+            btnExportarAuditoria.Cursor = Cursors.Hand;
+            btnExportarAuditoria.Click += BtnExportarAuditoria_Click;
+
+            gbFiltrosAuditoria.Text = "  🔍 Filtros Avanzados  ";
+            gbFiltrosAuditoria.Location = new Point(265, 1);
+            gbFiltrosAuditoria.Size = new Size(795, 60);
+            gbFiltrosAuditoria.Font = new Font("Segoe UI", 9f, FontStyle.Bold);
+            gbFiltrosAuditoria.ForeColor = azulInst;
+            gbFiltrosAuditoria.Controls.Add(cmbFiltrosRegistros);
+            gbFiltrosAuditoria.Controls.Add(lblDesde);
+            gbFiltrosAuditoria.Controls.Add(dtpDesde);
+            gbFiltrosAuditoria.Controls.Add(lblHasta);
+            gbFiltrosAuditoria.Controls.Add(dtpHasta);
+            gbFiltrosAuditoria.Controls.Add(btnFiltrar);
+            gbFiltrosAuditoria.Controls.Add(btnLimpiarFiltro);
+
+            cmbFiltrosRegistros.DropDownStyle = ComboBoxStyle.DropDownList;
+            cmbFiltrosRegistros.Font = new Font("Segoe UI", 9f);
+            cmbFiltrosRegistros.Items.AddRange(new object[] {
+            "Todos los Eventos",
+            "Entradas / Salidas (Tags)",
+            "Tickets Visitantes",
+            "Aperturas / Cierres Manuales",
+            "Mantenimientos del Parqueadero" });
+            cmbFiltrosRegistros.SelectedIndex = 0;
+            cmbFiltrosRegistros.Location = new Point(10, 24);
+            cmbFiltrosRegistros.Size = new Size(200, 28);
+
+            lblDesde.AutoSize = true;
+            lblDesde.Font = new Font("Segoe UI", 9f);
+            lblDesde.ForeColor = textoOscuro;
+            lblDesde.Location = new Point(220, 27);
+            lblDesde.Text = "Desde:";
+
+            dtpDesde.Format = DateTimePickerFormat.Short;
+            dtpDesde.Font = new Font("Segoe UI", 9f);
+            dtpDesde.Location = new Point(270, 24);
+            dtpDesde.Size = new Size(110, 27);
+
+            lblHasta.AutoSize = true;
+            lblHasta.Font = new Font("Segoe UI", 9f);
+            lblHasta.ForeColor = textoOscuro;
+            lblHasta.Location = new Point(390, 27);
+            lblHasta.Text = "Hasta:";
+
+            dtpHasta.Format = DateTimePickerFormat.Short;
+            dtpHasta.Font = new Font("Segoe UI", 9f);
+            dtpHasta.Location = new Point(440, 24);
+            dtpHasta.Size = new Size(110, 27);
+
+            btnFiltrar.FlatStyle = FlatStyle.Flat;
+            btnFiltrar.Font = new Font("Segoe UI", 9f, FontStyle.Bold);
+            btnFiltrar.ForeColor = blanco;
+            btnFiltrar.BackColor = azulOscuro;
+            btnFiltrar.FlatAppearance.BorderSize = 0;
+            btnFiltrar.Location = new Point(560, 22);
+            btnFiltrar.Size = new Size(100, 30);
+            btnFiltrar.Text = "🔍 Filtrar";
+            btnFiltrar.Cursor = Cursors.Hand;
+            // Event hooked in Form1.cs
+
+            btnLimpiarFiltro.FlatStyle = FlatStyle.Flat;
+            btnLimpiarFiltro.Font = new Font("Segoe UI", 9f, FontStyle.Bold);
+            btnLimpiarFiltro.ForeColor = textoOscuro;
+            btnLimpiarFiltro.BackColor = Color.FromArgb(224, 224, 224);
+            btnLimpiarFiltro.FlatAppearance.BorderSize = 0;
+            btnLimpiarFiltro.Location = new Point(670, 22);
+            btnLimpiarFiltro.Size = new Size(110, 30);
+            btnLimpiarFiltro.Text = "🧹 Limpiar";
+            btnLimpiarFiltro.Cursor = Cursors.Hand;
+            // Event hooked in Form1.cs
+
+            dgvAuditoria.Location = new Point(20, 74);
+            dgvAuditoria.Size = new Size(1040, 590);
+            dgvAuditoria.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom;
+
+            // ═══════════════════════════════════════════════════════════
+            // STATUS BAR
+            // ═══════════════════════════════════════════════════════════
+            statusStrip.BackColor = azulOscuro;
+            statusStrip.ImageScalingSize = new Size(20, 20);
+            statusStrip.Items.AddRange(new ToolStripItem[] { toolStripStatusLabel, toolStripStatusLabelHora });
+            statusStrip.Size = new Size(1380, 26);
+
+            toolStripStatusLabel.ForeColor = Color.FromArgb(180, 210, 240);
+            toolStripStatusLabel.Font = new Font("Segoe UI", 9f);
+            toolStripStatusLabel.Text = "  Sin conexión";
+
+            toolStripStatusLabelHora.ForeColor = Color.FromArgb(180, 210, 240);
+            toolStripStatusLabelHora.Font = new Font("Segoe UI", 9f);
+            toolStripStatusLabelHora.Spring = true;
+            toolStripStatusLabelHora.Text = "";
+            toolStripStatusLabelHora.TextAlign = ContentAlignment.MiddleRight;
+
+            // ═══════════════════════════════════════════════════════════
+            // FORM1 — Configuración
+            // ═══════════════════════════════════════════════════════════
+            AutoScaleDimensions = new SizeF(8F, 20F);
+            AutoScaleMode = AutoScaleMode.Font;
+            BackColor = fondoClaro;
+            ClientSize = new Size(1280, 900);
+            Controls.Add(panelContenido);
+            Controls.Add(panelSidebar);
+            Controls.Add(panelSuperior);
+            Controls.Add(statusStrip);
+            MinimumSize = new Size(1100, 800);
+            Name = "Form1";
+            StartPosition = FormStartPosition.CenterScreen;
+            WindowState = FormWindowState.Maximized;
+            Text = "PUCESA — Sistema de Control de Parqueadero";
+            FormClosing += Form1_FormClosing;
+            Load += Form1_Load;
+
+            // ═══════════════════════════════════════════════════════════
+            // RESUME LAYOUT
+            // ═══════════════════════════════════════════════════════════
+            panelSuperior.ResumeLayout(false);
+            panelSuperior.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)pictureBoxLogo).EndInit();
+            ((System.ComponentModel.ISupportInitialize)pictureBoxUsuario).EndInit();
+            ((System.ComponentModel.ISupportInitialize)pictureBoxAcceso).EndInit();
+            panelSidebar.ResumeLayout(false);
+            panelSidebar.PerformLayout();
+            panelContenido.ResumeLayout(false);
+            panelPagDashboard.ResumeLayout(false);
+            panelPagIncidencias.ResumeLayout(false);
+            panelPagAuditoria.ResumeLayout(false);
+            panelConfiguracion.ResumeLayout(false);
+            panelConfiguracion.PerformLayout();
+            panelEstadoBarrera.ResumeLayout(false);
+            panelSnapshot.ResumeLayout(false);
+            panelSnapshot.PerformLayout();
+            panelControl.ResumeLayout(false);
+            panelAccesoVisual.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)dgvIncidencias).EndInit();
+            ((System.ComponentModel.ISupportInitialize)dgvAuditoria).EndInit();
+            statusStrip.ResumeLayout(false);
+            statusStrip.PerformLayout();
+            ResumeLayout(false);
+            PerformLayout();
+        }
+
+        #endregion
+
+        // ═══════════════════════════════════════════════════════════
+        // DECLARACIONES
+        // ═══════════════════════════════════════════════════════════
+
+        // ── Header ──
+        private Panel panelSuperior;
+        private PictureBox pictureBoxLogo;
+        private Label lblTitulo;
+        private Label lblSubtitulo;
+        private Label lblRolUsuario;
+        private Label lblNombreOperador;
+        private Panel panelEstado;
+        private Label lblEstado;
+        private Button btnCerrarSesion;
+        private Button btnSalir;
+
+        // ── Sidebar ──
+        private Panel panelSidebar;
+        private Label lblSidebarTitulo;
+        private Label lblSidebarUsuario;
+        private Label lblSidebarGarita;
+        private Button btnNavDashboard;
+        private Button btnNavMapaParking;
+        private Button btnNavRegistroTags;
+        private Button btnNavIncidencias;
+        private Button btnNavAuditoria;
+        private Button btnNavConfiguracion;
+
+        // ── Contenido ──
+        private Panel panelContenido;
+        private Panel panelPagDashboard;
+        private Panel panelPagIncidencias;
+        private Panel panelPagAuditoria;
+        private Panel panelPagConfiguracion;
+
+        // ── Configuración ──
+        private GroupBox panelConfiguracion;
+        private Label lblIP;
+        private TextBox txtIP;
+        private Label lblPuerto;
+        private TextBox txtPuerto;
+        private Label lblTimeout;
+        private TextBox txtTimeout;
+        private Button btnConectar;
+
+        // ── Estado Barrera ──
+        private GroupBox panelEstadoBarrera;
+        private Panel panelLedArriba;
+        private Label lblIndicadorArriba;
+        private Panel panelLedAbajo;
+        private Label lblIndicadorAbajo;
+
+        // ── Snapshot ──
+        private Panel panelSnapshot;
+        private Label lblSnapshotTitulo;
+        private PictureBox pictureBoxUsuario;
+        private Label lblTagID;
+        private Label lblNombreUsuario;
+        private Label lblPlacaVehiculo;
+        private Label lblTipoUsuario;
+        private Label lblFacultad;
+
+        // ── Control Manual ──
+        private GroupBox panelControl;
+        private Button btnLevantar;
+        private Button btnBajar;
+        private Button btnResetearSistema;
+        private Button btnTicketVisitante;
+
+        // ── Acceso Visual ──
+        private GroupBox panelAccesoVisual;
+        private Panel panelUltimoAcceso;
+        private Label lblAccesoTitulo;
+        private Label lblAccesoNombre;
+        private Label lblAccesoPlaca;
+        private Label lblAccesoTipo;
+        private Label lblAccesoHora;
+        private Label lblAccesoDireccion;
+        private PictureBox pictureBoxAcceso;
+        private Panel panelHistorialAccesos;
+
+        // ── Incidencias ──
+        private DataGridView dgvIncidencias;
+        private GroupBox gbRegistroManual;
+        private TextBox txtIncidenciaManual;
+        private Button btnRegistrarIncidencia;
+        private Button btnExportar;
+        private Button btnImportar;
+
+        // ── Auditoría ──
+        private DataGridView dgvAuditoria;
+        private GroupBox gbFiltrosAuditoria;
+        private ComboBox cmbFiltrosRegistros;
+        private Label lblDesde;
+        private DateTimePicker dtpDesde;
+        private Label lblHasta;
+        private DateTimePicker dtpHasta;
+        private Button btnFiltrar;
+        private Button btnLimpiarFiltro;
+        private Button btnExportarAuditoria;
+
+        // ── Status Bar ──
+        private StatusStrip statusStrip;
+        private ToolStripStatusLabel toolStripStatusLabel;
+        private ToolStripStatusLabel toolStripStatusLabelHora;
+    }
+}

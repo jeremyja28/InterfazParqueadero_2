@@ -1,0 +1,265 @@
+﻿using System;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Linq;
+using System.Windows.Forms;
+
+namespace InterfazParqueadero
+{
+    public class LogsSistemaForm : Form
+    {
+        // ── Paleta PUCESA ─────────────────────────────────────────────────────
+        static readonly Color AzulOscuro  = Color.FromArgb(10, 40, 116);
+        static readonly Color AzulInst    = Color.FromArgb(81, 127, 164);
+        static readonly Color AzulAccent  = Color.FromArgb(115, 191, 213);
+        static readonly Color FondoClaro  = Color.FromArgb(242, 242, 242);
+        static readonly Color VerdeEsm    = Color.FromArgb(40, 167, 69);
+        static readonly Color RojoSuave   = Color.FromArgb(231, 49, 55);
+        static readonly Color NaranjaOp   = Color.FromArgb(230, 100, 20);
+        static readonly Color TextoOscuro = Color.FromArgb(26, 35, 50);
+        static readonly Color GrisBorde   = Color.FromArgb(210, 218, 230);
+
+        // ── Controles ─────────────────────────────────────────────────────────
+        Panel       pnlHeader   = null!;
+        Panel       pnlFiltros  = null!;
+        Panel       pnlStatus   = null!;
+        ComboBox    cmbFiltro   = null!;
+        DataGridView dgvLogs    = null!;
+        Label       lblStatus   = null!;
+
+        public LogsSistemaForm()
+        {
+            InitializeUI();
+            CargarFiltros();
+            AplicarFiltro();
+        }
+
+        // ═════════════════════════════════════════════════════════════════════
+        // UI
+        // ═════════════════════════════════════════════════════════════════════
+        void InitializeUI()
+        {
+            Text            = "Bitácora del Sistema";
+            Size            = new Size(900, 620);
+            StartPosition   = FormStartPosition.CenterScreen;
+            BackColor       = FondoClaro;
+            Font            = new Font("Segoe UI", 9.5f, FontStyle.Regular);
+            MinimumSize     = new Size(700, 480);
+
+            BuildHeader();
+            BuildFiltros();
+            BuildGrid();
+            BuildStatus();
+        }
+
+        void BuildHeader()
+        {
+            pnlHeader = new Panel
+            {
+                Dock      = DockStyle.Top,
+                Height    = 62,
+                BackColor = AzulOscuro
+            };
+            pnlHeader.Paint += (s, e) =>
+            {
+                using var pen = new Pen(AzulAccent, 3);
+                e.Graphics.DrawLine(pen, 0, pnlHeader.Height - 2, pnlHeader.Width, pnlHeader.Height - 2);
+            };
+
+            var lblTitulo = new Label
+            {
+                Text      = "🖥  Bitácora del Sistema",
+                ForeColor = Color.White,
+                Font      = new Font("Segoe UI", 16f, FontStyle.Bold),
+                AutoSize  = true,
+                Location  = new Point(18, 12)
+            };
+            pnlHeader.Controls.Add(lblTitulo);
+            Controls.Add(pnlHeader);
+        }
+
+        void BuildFiltros()
+        {
+            pnlFiltros = new Panel
+            {
+                Dock      = DockStyle.Top,
+                Height    = 52,
+                BackColor = Color.White,
+                Padding   = new Padding(12, 0, 12, 0)
+            };
+
+            var lblFiltro = new Label
+            {
+                Text      = "Período:",
+                AutoSize  = true,
+                Location  = new Point(12, 17),
+                Font      = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+                ForeColor = TextoOscuro
+            };
+
+            cmbFiltro = new ComboBox
+            {
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Location      = new Point(75, 13),
+                Width         = 160,
+                FlatStyle     = FlatStyle.Flat,
+                Font          = new Font("Segoe UI", 9.5f)
+            };
+            cmbFiltro.SelectedIndexChanged += (s, e) => AplicarFiltro();
+
+            var btnRefrescar = new Button
+            {
+                Text      = "↻  Actualizar",
+                Location  = new Point(248, 11),
+                Width     = 110,
+                Height    = 30,
+                FlatStyle = FlatStyle.Flat,
+                BackColor = AzulInst,
+                ForeColor = Color.White,
+                Font      = new Font("Segoe UI", 9f, FontStyle.Bold),
+                Cursor    = Cursors.Hand
+            };
+            btnRefrescar.FlatAppearance.BorderSize = 0;
+            btnRefrescar.Click += (s, e) => AplicarFiltro();
+
+            pnlFiltros.Controls.AddRange(new Control[] { lblFiltro, cmbFiltro, btnRefrescar });
+
+            // Separador
+            pnlFiltros.Paint += (s, e) =>
+            {
+                using var pen = new Pen(GrisBorde, 1);
+                e.Graphics.DrawLine(pen, 0, pnlFiltros.Height - 1, pnlFiltros.Width, pnlFiltros.Height - 1);
+            };
+
+            Controls.Add(pnlFiltros);
+        }
+
+        void BuildGrid()
+        {
+            dgvLogs = new DataGridView
+            {
+                Dock                  = DockStyle.Fill,
+                ReadOnly              = true,
+                AllowUserToAddRows    = false,
+                AllowUserToDeleteRows = false,
+                SelectionMode         = DataGridViewSelectionMode.FullRowSelect,
+                RowHeadersVisible     = false,
+                BackgroundColor       = FondoClaro,
+                BorderStyle           = BorderStyle.None,
+                Font                  = new Font("Segoe UI", 9.5f),
+                AutoSizeColumnsMode   = DataGridViewAutoSizeColumnsMode.None,
+                ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing,
+                ColumnHeadersHeight   = 36
+            };
+            dgvLogs.ColumnHeadersDefaultCellStyle.BackColor = AzulInst;
+            dgvLogs.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+            dgvLogs.ColumnHeadersDefaultCellStyle.Font      = new Font("Segoe UI", 9.5f, FontStyle.Bold);
+            dgvLogs.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            dgvLogs.EnableHeadersVisualStyles = false;
+            dgvLogs.DefaultCellStyle.SelectionBackColor = AzulAccent;
+            dgvLogs.DefaultCellStyle.SelectionForeColor = TextoOscuro;
+            dgvLogs.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(245, 249, 253);
+
+            dgvLogs.Columns.Add(new DataGridViewTextBoxColumn { Name = "FechaHora", HeaderText = "Fecha / Hora",      Width = 145, DefaultCellStyle = { Alignment = DataGridViewContentAlignment.MiddleCenter } });
+            dgvLogs.Columns.Add(new DataGridViewTextBoxColumn { Name = "Accion",    HeaderText = "Acción",            Width = 170, DefaultCellStyle = { Font = new Font("Segoe UI", 9.5f, FontStyle.Bold) } });
+            dgvLogs.Columns.Add(new DataGridViewTextBoxColumn { Name = "Detalle",   HeaderText = "Detalle",            AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
+            dgvLogs.Columns.Add(new DataGridViewTextBoxColumn { Name = "Id",        HeaderText = "ID",                Width = 70,  DefaultCellStyle = { Alignment = DataGridViewContentAlignment.MiddleCenter, ForeColor = Color.Gray } });
+
+            dgvLogs.CellFormatting += DgvLogs_CellFormatting;
+
+            Controls.Add(dgvLogs);
+        }
+
+        void BuildStatus()
+        {
+            pnlStatus = new Panel
+            {
+                Dock      = DockStyle.Bottom,
+                Height    = 32,
+                BackColor = Color.White
+            };
+            pnlStatus.Paint += (s, e) =>
+            {
+                using var pen = new Pen(GrisBorde, 1);
+                e.Graphics.DrawLine(pen, 0, 0, pnlStatus.Width, 0);
+            };
+            lblStatus = new Label
+            {
+                AutoSize  = false,
+                Dock      = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Padding   = new Padding(12, 0, 0, 0),
+                ForeColor = AzulInst,
+                Font      = new Font("Segoe UI", 9f)
+            };
+            pnlStatus.Controls.Add(lblStatus);
+            Controls.Add(pnlStatus);
+        }
+
+        // ═════════════════════════════════════════════════════════════════════
+        // FILTROS
+        // ═════════════════════════════════════════════════════════════════════
+        void CargarFiltros()
+        {
+            cmbFiltro.Items.Clear();
+            cmbFiltro.Items.Add("Hoy");
+            cmbFiltro.Items.Add("Ayer");
+            cmbFiltro.Items.Add("Últimos 7 días");
+            cmbFiltro.Items.Add("Este mes");
+            cmbFiltro.Items.Add("Todos");
+            cmbFiltro.SelectedIndex = 0;
+        }
+
+        void AplicarFiltro()
+        {
+            dgvLogs.Rows.Clear();
+            var hoy   = DateTime.Today;
+            var desde = hoy;
+            var hasta = hoy.AddDays(1);
+
+            switch (cmbFiltro.SelectedIndex)
+            {
+                case 0: desde = hoy;              hasta = hoy.AddDays(1);  break;  // Hoy
+                case 1: desde = hoy.AddDays(-1);  hasta = hoy;             break;  // Ayer
+                case 2: desde = hoy.AddDays(-7);  hasta = hoy.AddDays(1);  break;  // 7 días
+                case 3: desde = new DateTime(hoy.Year, hoy.Month, 1); hasta = desde.AddMonths(1); break; // Este mes
+                case 4: desde = DateTime.MinValue; hasta = DateTime.MaxValue; break; // Todos
+            }
+
+            var lista = AuditoriaService.Logs
+                .Where(l => l.FechaHora >= desde && l.FechaHora < hasta)
+                .OrderByDescending(l => l.FechaHora)
+                .ToList();
+
+            foreach (var log in lista)
+            {
+                dgvLogs.Rows.Add(
+                    log.FechaHora.ToString("dd/MM/yyyy HH:mm:ss"),
+                    log.Accion,
+                    log.Detalle,
+                    log.Id
+                );
+            }
+
+            lblStatus.Text = $"  {lista.Count} registro(s) encontrado(s)  —  " +
+                             $"Filtro: {cmbFiltro.Text}";
+        }
+
+        // ═════════════════════════════════════════════════════════════════════
+        // COLORES POR ACCIÓN
+        // ═════════════════════════════════════════════════════════════════════
+        void DgvLogs_CellFormatting(object? sender, DataGridViewCellFormattingEventArgs e)
+        {
+            if (e.RowIndex < 0 || dgvLogs.Columns[e.ColumnIndex].Name != "Accion") return;
+
+            string accion = dgvLogs.Rows[e.RowIndex].Cells["Accion"].Value?.ToString() ?? "";
+            e.CellStyle.ForeColor = accion switch
+            {
+                _ when accion.Contains("SUBIÓ") || accion.Contains("ENTRÓ")  => VerdeEsm,
+                _ when accion.Contains("BAJÓ")  || accion.Contains("SALIÓ")  => RojoSuave,
+                _ when accion.Contains("MANUAL")                              => NaranjaOp,
+                _                                                             => AzulInst
+            };
+        }
+    }
+}

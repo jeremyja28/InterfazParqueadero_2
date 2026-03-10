@@ -18,13 +18,15 @@ namespace InterfazParqueadero
         public DateTime? FechaSalida { get; set; }
         public decimal TotalPagar { get; set; }
         public bool Activo { get; set; } = true;
+        public string? Observacion { get; set; }
+        public bool EsMoto { get; set; } = false;
     }
 
     /// <summary>
     /// Formulario para gestión de tickets de visitantes.
     /// Dos modos: Entrada (generar ticket) y Salida (cobro con popup personalizado).
     /// </summary>
-    public class TicketVisitanteForm : Form
+    public partial class TicketVisitanteForm : Form
     {
         // ═══════════════════════════════════════════════════════════
         // PALETA PUCESA
@@ -42,9 +44,9 @@ namespace InterfazParqueadero
         // ═══════════════════════════════════════════════════════════
         // DATOS ESTÁTICOS (persisten entre aperturas)
         // ═══════════════════════════════════════════════════════════
-        private static readonly List<TicketVisitante> TicketsActivos = new();
+        internal static readonly List<TicketVisitante> TicketsActivos = new();
         private static int _contadorTickets = 1000;
-        private const decimal TARIFA_HORA = 0.50m;
+        internal const decimal TARIFA_HORA = 0.50m;
         private const decimal TARIFA_MINIMA = 0.25m;
 
         // ── Controles Entrada ──
@@ -57,6 +59,9 @@ namespace InterfazParqueadero
         private Label lblResumenCobro = null!;
         private Button btnCobrarAbrir = null!;
         private TicketVisitante? _ticketSalida;
+
+        // Nombre exacto de la impresora en Windows (debe coincidir con el nombre en Dispositivos e impresoras)
+        private string nombreImpresora = "EPSON TM-T20III Receipt";
 
         private string _modo = "entrada";
 
@@ -71,6 +76,10 @@ namespace InterfazParqueadero
         public event Action? OnAbrirBarrera;
         /// <summary>Evento para solicitar cierre/bajada de barrera.</summary>
         public event Action? OnBajarBarrera;
+        /// <summary>Disparado al generar un ticket de entrada. Parámetros: placa, código.</summary>
+        public event Action<string, string>? OnVisitanteEntro;
+        /// <summary>Disparado al cobrar un ticket de salida. Parámetros: placa, código, total.</summary>
+        public event Action<string, string, decimal>? OnVisitanteSalio;
 
         public TicketVisitanteForm() : this("entrada") { }
 
@@ -383,6 +392,7 @@ namespace InterfazParqueadero
 
             // Abrir barrera tras generar ticket de entrada
             OnAbrirBarrera?.Invoke();
+            OnVisitanteEntro?.Invoke(placa, _ticketGenerado.Codigo);
         }
 
         /// <summary>
@@ -523,7 +533,44 @@ namespace InterfazParqueadero
                     autoClose.Start();
                 }
             };
-            popup.Shown += (s, ev) => timer.Start();
+            popup.Shown += (s, ev) =>
+            {
+                // Enviar ticket de entrada a la impresora térmica (ESC/POS)
+                try
+                {
+                    byte[] data = new EscPosBuilder()
+                        .Init()
+                        .Center()
+                        .Bold(true).DoubleHeight(true).TextLine("Parqueadero").TextLine("PUCESA").DoubleHeight(false).Bold(false)
+                        .TextLine("Av. Los Chasquis s/n, Ambato")
+                        .Separator(42)
+                        .Left()
+                        .TextLine($"Comprobante: {ticket.Codigo}")
+                        .TextLine($"Placa      : {ticket.Placa}")
+                        .TextLine($"Fecha      : {ticket.FechaEntrada:dd/MM/yyyy}")
+                        .TextLine($"Hora       : {ticket.FechaEntrada:HH:mm:ss}")
+                        .Separator(42)
+                        .Center()
+                        .TextLine($"Tarifa: ${TARIFA_HORA}/hora (min. ${TARIFA_MINIMA})")
+                        .Separator(42)
+                        .Left()
+                        .TextLine("- Pague antes de salir al parqueo")
+                        .TextLine("- Ticket perdido: $10.00")
+                        .Separator(42)
+                        .Center()
+                        .Barcode128(ticket.Codigo)
+                        .Feed(4)
+                        .FullCut()
+                        .Build();
+                    RawPrinterHelper.SendBytesToPrinter(nombreImpresora, data);
+                }
+                catch (Exception ex)
+                {
+                    lblEstado.Text = $"⚠ Error de impresora: {ex.Message}";
+                    lblEstado.ForeColor = Color.FromArgb(220, 53, 69);
+                }
+                timer.Start();
+            };
             popup.FormClosed += (s, ev) => { timer.Stop(); timer.Dispose(); };
             popup.ShowDialog(this);
         }
@@ -859,10 +906,15 @@ namespace InterfazParqueadero
             ActualizarComboTickets();
             btnCobrarAbrir.Enabled = false;
 
+            decimal totalCobrado = _ticketSalida.TotalPagar;
+            string codigoSalida  = _ticketSalida.Codigo;
+            string placaSalida   = _ticketSalida.Placa;
+
             // Mostrar popup personalizado
             MostrarPopupCobroExitoso(_ticketSalida);
 
             OnAbrirBarrera?.Invoke();
+            OnVisitanteSalio?.Invoke(placaSalida, codigoSalida, totalCobrado);
             _ticketSalida = null;
             lblResumenCobro.Text = "Escanee o seleccione un ticket activo\npara ver el resumen de cobro.";
         }
@@ -1025,6 +1077,152 @@ namespace InterfazParqueadero
             popup.Shown += (s, ev) => timer.Start();
             popup.FormClosed += (s, ev) => { timer.Stop(); timer.Dispose(); };
             popup.ShowDialog(this);
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // MÉTODOS ESTÁTICOS — Usados desde Form1 (escaner dashboard)
+        // ═══════════════════════════════════════════════════════════
+
+        /// <summary>Persiste en disco los tickets desde la memoria estática.</summary>
+        public static void GuardarTicketsEnArchivo()
+        {
+            TicketStorageService.Guardar(TicketsActivos, _contadorTickets);
+        }
+
+        /// <summary>Recarga los tickets y el contador desde el archivo JSON.</summary>
+        public static void RecargarDesdeJSON()
+        {
+            var (tickets, contador) = TicketStorageService.Cargar();
+            TicketsActivos.Clear();
+            TicketsActivos.AddRange(tickets);
+            _contadorTickets = contador;
+        }
+
+        /// <summary>
+        /// Muestra un diálogo de confirmación de pago desde el escaner del dashboard.
+        /// Devuelve true si el operador confirma el cobro.
+        /// </summary>
+        public static bool MostrarConfirmarPago(
+            IWin32Window owner,
+            TicketVisitante ticket,
+            TimeSpan permanencia,
+            decimal horas,
+            decimal total)
+        {
+            string msg =
+                $"TICKET : {ticket.Codigo}\n" +
+                $"PLACA  : {ticket.Placa}\n" +
+                $"Entrada: {ticket.FechaEntrada:dd/MM/yyyy HH:mm:ss}\n" +
+                $"Tiempo : {(int)permanencia.TotalHours}h {permanencia.Minutes}m\n" +
+                $"Horas cobradas: {horas}\n\n" +
+                $"TOTAL A COBRAR: ${total:F2}";
+
+            return MessageBox.Show(
+                owner, msg,
+                "Confirmar Cobro — Visitante",
+                MessageBoxButtons.OKCancel,
+                MessageBoxIcon.Question,
+                MessageBoxDefaultButton.Button1) == DialogResult.OK;
+        }
+
+        /// <summary>
+        /// Versión estática del popup de cobro exitoso — llamada desde Form1.
+        /// </summary>
+        public static void MostrarPopupCobroExitoso(IWin32Window owner, TicketVisitante ticket)
+        {
+            Form popup = new Form
+            {
+                Text = "Cobro Exitoso",
+                ClientSize = new Size(420, 380),
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.None,
+                BackColor = BlancoCard,
+                ShowInTaskbar = false,
+                TopMost = true
+            };
+
+            popup.Paint += (s, ev) =>
+            {
+                using Pen borderPen = new Pen(VerdeEsm, 3);
+                ev.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                ev.Graphics.DrawRectangle(borderPen, 1, 1, popup.Width - 3, popup.Height - 3);
+            };
+
+            popup.Controls.Add(new Panel { Dock = DockStyle.Top, Height = 4, BackColor = VerdeEsm });
+
+            Label lblExito = new Label
+            {
+                Text = "✅  ¡COBRO EXITOSO!",
+                Font = new Font("Segoe UI", 18f, FontStyle.Bold),
+                ForeColor = VerdeEsm, TextAlign = ContentAlignment.MiddleCenter,
+                Location = new Point(0, 30), Size = new Size(420, 44)
+            };
+            popup.Controls.Add(lblExito);
+
+            int y = 100;
+            foreach (var (lbl, val, bold) in new[]
+            {
+                ("Ticket:", ticket.Codigo, false),
+                ("Placa:", ticket.Placa, false),
+                ("Total cobrado:", $"${ticket.TotalPagar:F2}", true)
+            })
+            {
+                popup.Controls.Add(new Label
+                {
+                    Text = lbl,
+                    Font = new Font("Segoe UI", 10f),
+                    ForeColor = Color.Gray,
+                    Location = new Point(50, y), AutoSize = true
+                });
+                popup.Controls.Add(new Label
+                {
+                    Text = val,
+                    Font = new Font("Segoe UI", bold ? 12f : 10f,
+                                   bold ? FontStyle.Bold : FontStyle.Regular),
+                    ForeColor = bold ? VerdeEsm : TextoOscuro,
+                    Location = new Point(210, y), AutoSize = true
+                });
+                y += bold ? 38 : 30;
+            }
+
+            Label lblTimer = new Label
+            {
+                Text = "Se cerrará automáticamente en 4s",
+                Font = new Font("Segoe UI", 8f), ForeColor = Color.Gray,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Location = new Point(0, popup.ClientSize.Height - 40),
+                Size = new Size(420, 20)
+            };
+            popup.Controls.Add(lblTimer);
+
+            Button btnOk = new Button
+            {
+                Text = "ACEPTAR",
+                Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+                ForeColor = Color.White, BackColor = VerdeEsm,
+                FlatStyle = FlatStyle.Flat,
+                Location = new Point(140, popup.ClientSize.Height - 60),
+                Size = new Size(140, 38),
+                Cursor = Cursors.Hand, DialogResult = DialogResult.OK
+            };
+            btnOk.FlatAppearance.BorderSize = 0;
+            popup.Controls.Add(btnOk);
+
+            int secsLeft = 4;
+            var timer = new System.Windows.Forms.Timer { Interval = 1000 };
+            timer.Tick += (ts, te) =>
+            {
+                secsLeft--;
+                lblTimer.Text = $"Se cerrará automáticamente en {secsLeft}s";
+                if (secsLeft <= 0)
+                {
+                    timer.Stop(); timer.Dispose();
+                    if (!popup.IsDisposed) { popup.DialogResult = DialogResult.OK; popup.Close(); }
+                }
+            };
+            popup.Shown += (s, ev) => timer.Start();
+            popup.FormClosed += (s, ev) => { timer.Stop(); timer.Dispose(); };
+            popup.ShowDialog(owner);
         }
     }
 }

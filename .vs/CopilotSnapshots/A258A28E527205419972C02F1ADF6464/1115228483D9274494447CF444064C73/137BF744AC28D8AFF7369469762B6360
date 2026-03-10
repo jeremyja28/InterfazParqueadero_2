@@ -1,0 +1,162 @@
+﻿namespace InterfazParqueadero
+{
+    partial class MantenimientoForm
+    {
+        private System.ComponentModel.IContainer components = null;
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && (components != null))
+            {
+                components.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+
+        #region Windows Form Designer generated code
+
+        private void InitializeComponent()
+        {
+            Color azulInst = Color.FromArgb(10, 40, 116);
+            Color rojoSuave = Color.FromArgb(231, 49, 55);
+            Color verdeEsm = Color.FromArgb(40, 167, 69);
+            Color naranja = Color.FromArgb(230, 100, 20);
+            Color fondoGris = Color.FromArgb(245, 245, 245);
+
+            // Controles
+            lblEstado = new Label();
+            nudCantidad = new NumericUpDown();
+            rdCarro = new RadioButton();
+            rdMoto = new RadioButton();
+            btnPoner = new Button();
+            btnHabilitar = new Button();
+            Label lblTitulo = new Label();
+            Label lblCantidad = new Label();
+            Label lblTipo = new Label();
+
+            ((System.ComponentModel.ISupportInitialize)nudCantidad).BeginInit();
+            SuspendLayout();
+
+            // lblTitulo
+            lblTitulo.Text = "Gestión de Mantenimiento";
+            lblTitulo.Font = new Font("Segoe UI", 13F, FontStyle.Bold);
+            lblTitulo.ForeColor = azulInst;
+            lblTitulo.BackColor = Color.White;
+            lblTitulo.Dock = DockStyle.Top;
+            lblTitulo.Height = 50;
+            lblTitulo.TextAlign = ContentAlignment.MiddleCenter;
+
+            // lblEstado
+            lblEstado.Text = "";
+            lblEstado.Font = new Font("Segoe UI", 10F);
+            lblEstado.ForeColor = Color.DimGray;
+            lblEstado.Location = new Point(20, 62);
+            lblEstado.Size = new Size(400, 22);
+            lblEstado.TextAlign = ContentAlignment.MiddleCenter;
+
+            // lblCantidad
+            lblCantidad.Text = "Cantidad de espacios:";
+            lblCantidad.Font = new Font("Segoe UI", 10F);
+            lblCantidad.ForeColor = Color.Black;
+            lblCantidad.Location = new Point(20, 96);
+            lblCantidad.Size = new Size(400, 22);
+            lblCantidad.TextAlign = ContentAlignment.MiddleCenter;
+
+            // nudCantidad
+            nudCantidad.Minimum = 1;
+            nudCantidad.Maximum = CapacidadService.CapacidadTotal;
+            nudCantidad.Value = 1;
+            nudCantidad.Font = new Font("Segoe UI", 24F, FontStyle.Bold);
+            nudCantidad.Location = new Point(160, 122);
+            nudCantidad.Size = new Size(120, 55);
+            nudCantidad.TextAlign = HorizontalAlignment.Center;
+
+            // lblTipo
+            lblTipo.Text = "Tipo de espacio:";
+            lblTipo.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            lblTipo.ForeColor = Color.DimGray;
+            lblTipo.Location = new Point(20, 186);
+            lblTipo.Size = new Size(400, 20);
+            lblTipo.TextAlign = ContentAlignment.MiddleCenter;
+
+            // rdCarro
+            rdCarro.Text = "🚗  Espacio de Carro  (máx. 113)";
+            rdCarro.Font = new Font("Segoe UI", 10.5F, FontStyle.Bold);
+            rdCarro.ForeColor = azulInst;
+            rdCarro.Location = new Point(60, 210);
+            rdCarro.AutoSize = true;
+            rdCarro.Checked = true;
+            rdCarro.Cursor = Cursors.Hand;
+            rdCarro.CheckedChanged += RdTipo_CheckedChanged;
+
+            // rdMoto
+            rdMoto.Text = "🏍️  Espacio de Moto  (máx. 16)";
+            rdMoto.Font = new Font("Segoe UI", 10.5F, FontStyle.Bold);
+            rdMoto.ForeColor = naranja;
+            rdMoto.Location = new Point(60, 238);
+            rdMoto.AutoSize = true;
+            rdMoto.Cursor = Cursors.Hand;
+            rdMoto.CheckedChanged += RdTipo_CheckedChanged;
+
+            // btnPoner
+            btnPoner.Text = "🔧  Enviar a Mantenimiento";
+            btnPoner.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
+            btnPoner.ForeColor = Color.White;
+            btnPoner.BackColor = rojoSuave;
+            btnPoner.FlatStyle = FlatStyle.Flat;
+            btnPoner.Location = new Point(40, 274);
+            btnPoner.Size = new Size(360, 48);
+            btnPoner.Cursor = Cursors.Hand;
+            btnPoner.FlatAppearance.BorderSize = 0;
+            btnPoner.Click += BtnPoner_Click;
+
+            // btnHabilitar
+            btnHabilitar.Text = "✅  Habilitar Espacios";
+            btnHabilitar.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
+            btnHabilitar.ForeColor = Color.White;
+            btnHabilitar.BackColor = verdeEsm;
+            btnHabilitar.FlatStyle = FlatStyle.Flat;
+            btnHabilitar.Location = new Point(40, 322);
+            btnHabilitar.Size = new Size(360, 48);
+            btnHabilitar.Cursor = Cursors.Hand;
+            btnHabilitar.FlatAppearance.BorderSize = 0;
+            btnHabilitar.Click += BtnHabilitar_Click;
+
+            // MantenimientoForm
+            AutoScaleDimensions = new SizeF(8F, 20F);
+            AutoScaleMode = AutoScaleMode.Font;
+            ClientSize = new Size(440, 380);
+            FormBorderStyle = FormBorderStyle.FixedDialog;
+            MaximizeBox = false;
+            MinimizeBox = false;
+            StartPosition = FormStartPosition.CenterParent;
+            BackColor = fondoGris;
+            Font = new Font("Segoe UI", 10F);
+            Name = "MantenimientoForm";
+            Text = "Gestión de Mantenimiento";
+            Load += MantenimientoForm_Load;
+            Controls.Add(lblTitulo);
+            Controls.Add(lblEstado);
+            Controls.Add(lblCantidad);
+            Controls.Add(nudCantidad);
+            Controls.Add(lblTipo);
+            Controls.Add(rdCarro);
+            Controls.Add(rdMoto);
+            Controls.Add(btnPoner);
+            Controls.Add(btnHabilitar);
+
+            ((System.ComponentModel.ISupportInitialize)nudCantidad).EndInit();
+            ResumeLayout(false);
+            PerformLayout();
+        }
+
+        #endregion
+
+        private Label lblEstado;
+        private NumericUpDown nudCantidad;
+        private RadioButton rdCarro;
+        private RadioButton rdMoto;
+        private Button btnPoner;
+        private Button btnHabilitar;
+    }
+}

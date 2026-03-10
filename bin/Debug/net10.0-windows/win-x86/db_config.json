@@ -1,0 +1,7 @@
+{
+  "Servidor": "127.0.0.1\\SQLEXPRESS",
+  "Puerto": 1433,
+  "BaseDatos": "ParqueaderoDB",
+  "Usuario": "sa",
+  "Password": "admin"
+}

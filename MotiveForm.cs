@@ -9,7 +9,7 @@ namespace InterfazParqueadero
     /// Se abre antes de ejecutar Abrir/Cerrar manualmente.
     /// Los datos se almacenan en la lista de auditoría.
     /// </summary>
-    public class MotiveForm : Form
+    public partial class MotiveForm : Form
     {
         private static readonly Color AzulOscuro = Color.FromArgb(13, 33, 55);
         private static readonly Color AzulAccent = Color.FromArgb(46, 134, 193);

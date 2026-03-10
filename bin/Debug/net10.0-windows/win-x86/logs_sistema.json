@@ -1,0 +1,212 @@
+[
+  {
+    "Id": "738EBDE9",
+    "FechaHora": "2026-03-06T15:19:19.0950721-05:00",
+    "Accion": "BARRERA SUBI\u00D3",
+    "Detalle": "Apertura Manual \u2014 Administrador"
+  },
+  {
+    "Id": "60500F75",
+    "FechaHora": "2026-03-06T15:19:24.2154109-05:00",
+    "Accion": "BARRERA BAJ\u00D3",
+    "Detalle": "Bajada Manual \u2014 Administrador"
+  },
+  {
+    "Id": "ECAF429E",
+    "FechaHora": "2026-03-06T15:19:27.8740607-05:00",
+    "Accion": "BARRERA BAJ\u00D3",
+    "Detalle": "Bajada Manual \u2014 Administrador"
+  },
+  {
+    "Id": "16C03CA7",
+    "FechaHora": "2026-03-06T15:19:28.8024328-05:00",
+    "Accion": "BARRERA BAJ\u00D3",
+    "Detalle": "Bajada Manual \u2014 Administrador"
+  },
+  {
+    "Id": "032CE0E6",
+    "FechaHora": "2026-03-06T15:19:29.0280067-05:00",
+    "Accion": "BARRERA BAJ\u00D3",
+    "Detalle": "Bajada Manual \u2014 Administrador"
+  },
+  {
+    "Id": "BE7A420F",
+    "FechaHora": "2026-03-06T15:29:00.5886977-05:00",
+    "Accion": "BARRERA SUBI\u00D3",
+    "Detalle": "Apertura Manual \u2014 Administrador"
+  },
+  {
+    "Id": "75B744C7",
+    "FechaHora": "2026-03-06T15:29:05.6650324-05:00",
+    "Accion": "BARRERA BAJ\u00D3",
+    "Detalle": "Bajada Manual \u2014 Administrador"
+  },
+  {
+    "Id": "AACC0CE4",
+    "FechaHora": "2026-03-06T15:30:13.1703558-05:00",
+    "Accion": "BARRERA BAJ\u00D3",
+    "Detalle": "Bajada Manual \u2014 Administrador"
+  },
+  {
+    "Id": "BD9670E5",
+    "FechaHora": "2026-03-06T15:48:50.5733968-05:00",
+    "Accion": "BARRERA SUBI\u00D3",
+    "Detalle": "Apertura Manual \u2014 Administrador"
+  },
+  {
+    "Id": "B1D18FA7",
+    "FechaHora": "2026-03-06T15:48:54.5927272-05:00",
+    "Accion": "BARRERA BAJ\u00D3",
+    "Detalle": "Bajada Manual \u2014 Administrador"
+  },
+  {
+    "Id": "2A178698",
+    "FechaHora": "2026-03-06T15:52:44.1153365-05:00",
+    "Accion": "BARRERA SUBI\u00D3",
+    "Detalle": "Apertura Manual \u2014 Administrador"
+  },
+  {
+    "Id": "576BA54D",
+    "FechaHora": "2026-03-06T15:52:47.8331323-05:00",
+    "Accion": "BARRERA BAJ\u00D3",
+    "Detalle": "Bajada Manual \u2014 Administrador"
+  },
+  {
+    "Id": "ADC6A472",
+    "FechaHora": "2026-03-06T15:52:56.847074-05:00",
+    "Accion": "BARRERA SUBI\u00D3",
+    "Detalle": "Apertura Manual \u2014 Administrador"
+  },
+  {
+    "Id": "08016860",
+    "FechaHora": "2026-03-06T15:53:00.8414342-05:00",
+    "Accion": "BARRERA BAJ\u00D3",
+    "Detalle": "Bajada Manual \u2014 Administrador"
+  },
+  {
+    "Id": "DB2B17F6",
+    "FechaHora": "2026-03-06T15:56:40.5035735-05:00",
+    "Accion": "BARRERA SUBI\u00D3",
+    "Detalle": "Apertura Manual \u2014 Administrador"
+  },
+  {
+    "Id": "EC9C66C6",
+    "FechaHora": "2026-03-06T15:56:43.9604088-05:00",
+    "Accion": "BARRERA BAJ\u00D3",
+    "Detalle": "Bajada Manual \u2014 Administrador"
+  },
+  {
+    "Id": "642F6380",
+    "FechaHora": "2026-03-06T15:57:20.8719204-05:00",
+    "Accion": "BARRERA SUBI\u00D3",
+    "Detalle": "Apertura Manual \u2014 Administrador"
+  },
+  {
+    "Id": "71470AD3",
+    "FechaHora": "2026-03-06T15:57:55.8558931-05:00",
+    "Accion": "BARRERA SUBI\u00D3",
+    "Detalle": "Apertura Manual \u2014 Administrador"
+  },
+  {
+    "Id": "56110B5C",
+    "FechaHora": "2026-03-06T15:58:10.8281613-05:00",
+    "Accion": "BARRERA BAJ\u00D3",
+    "Detalle": "Bajada Manual \u2014 Administrador"
+  },
+  {
+    "Id": "9417AF06",
+    "FechaHora": "2026-03-06T16:10:10.790023-05:00",
+    "Accion": "BARRERA SUBI\u00D3",
+    "Detalle": "Apertura Manual \u2014 Administrador"
+  },
+  {
+    "Id": "937CB853",
+    "FechaHora": "2026-03-06T16:10:15.0576151-05:00",
+    "Accion": "BARRERA BAJ\u00D3",
+    "Detalle": "Bajada Manual \u2014 Administrador"
+  },
+  {
+    "Id": "21B70A74",
+    "FechaHora": "2026-03-09T08:44:41.9303355-05:00",
+    "Accion": "BARRERA BAJ\u00D3",
+    "Detalle": "Bajada Manual \u2014 Administrador"
+  },
+  {
+    "Id": "A53CE25C",
+    "FechaHora": "2026-03-09T15:04:27.4274963-05:00",
+    "Accion": "BARRERA SUBI\u00D3",
+    "Detalle": "Apertura Manual \u2014 Administrador"
+  },
+  {
+    "Id": "686904C1",
+    "FechaHora": "2026-03-09T15:04:29.946725-05:00",
+    "Accion": "BARRERA BAJ\u00D3",
+    "Detalle": "Bajada Manual \u2014 Administrador"
+  },
+  {
+    "Id": "16C70A30",
+    "FechaHora": "2026-03-09T16:12:26.3092571-05:00",
+    "Accion": "BARRERA SUBI\u00D3",
+    "Detalle": "REMOTO | Button1 InBIO \u2014 Administrador"
+  },
+  {
+    "Id": "BCF490AF",
+    "FechaHora": "2026-03-09T16:15:27.1393041-05:00",
+    "Accion": "BARRERA BAJ\u00D3",
+    "Detalle": "Bajada Manual \u2014 Administrador"
+  },
+  {
+    "Id": "AA6AF852",
+    "FechaHora": "2026-03-09T16:15:35.6719661-05:00",
+    "Accion": "BARRERA SUBI\u00D3",
+    "Detalle": "Apertura Manual \u2014 Administrador"
+  },
+  {
+    "Id": "2EF15C43",
+    "FechaHora": "2026-03-09T16:15:39.6299902-05:00",
+    "Accion": "BARRERA BAJ\u00D3",
+    "Detalle": "Bajada Manual \u2014 Administrador"
+  },
+  {
+    "Id": "0EF97D30",
+    "FechaHora": "2026-03-09T16:16:13.8771019-05:00",
+    "Accion": "BARRERA SUBI\u00D3",
+    "Detalle": "Apertura Manual \u2014 Administrador"
+  },
+  {
+    "Id": "C3477182",
+    "FechaHora": "2026-03-09T16:34:29.6622268-05:00",
+    "Accion": "BARRERA SUBI\u00D3",
+    "Detalle": "MANUAL | Ticket visitante \u2014 Administrador"
+  },
+  {
+    "Id": "3E76951E",
+    "FechaHora": "2026-03-09T16:37:48.6637071-05:00",
+    "Accion": "BARRERA SUBI\u00D3",
+    "Detalle": "MANUAL | Ticket visitante \u2014 Administrador"
+  },
+  {
+    "Id": "10B95CAC",
+    "FechaHora": "2026-03-09T16:38:05.285166-05:00",
+    "Accion": "BARRERA SUBI\u00D3",
+    "Detalle": "MANUAL | Ticket visitante \u2014 Administrador"
+  },
+  {
+    "Id": "DC0F67C1",
+    "FechaHora": "2026-03-09T16:38:54.0169958-05:00",
+    "Accion": "BARRERA SUBI\u00D3",
+    "Detalle": "MANUAL | Ticket visitante \u2014 Administrador"
+  },
+  {
+    "Id": "E048263F",
+    "FechaHora": "2026-03-09T16:48:12.7662566-05:00",
+    "Accion": "BARRERA SUBI\u00D3",
+    "Detalle": "MANUAL | Ticket visitante \u2014 Administrador"
+  },
+  {
+    "Id": "D71A0285",
+    "FechaHora": "2026-03-09T16:51:49.7120255-05:00",
+    "Accion": "BARRERA SUBI\u00D3",
+    "Detalle": "MANUAL | Ticket visitante \u2014 Administrador"
+  }
+]

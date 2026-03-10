@@ -1,0 +1,119 @@
+[
+  {
+    "Id": "8239EED1",
+    "FechaEntrada": "2026-03-06T15:29:57.4221774-05:00",
+    "FechaSalida": "2026-03-06T15:29:57.4221984-05:00",
+    "Tipo": "VISITANTE",
+    "Cedula": "",
+    "NombreCompleto": "Visitante (V001021)",
+    "Placa": "TGY-5165"
+  },
+  {
+    "Id": "15840FE6",
+    "FechaEntrada": "2026-03-06T15:36:31.3692086-05:00",
+    "FechaSalida": "2026-03-06T15:36:31.3692087-05:00",
+    "Tipo": "VISITANTE",
+    "Cedula": "",
+    "NombreCompleto": "Visitante Exonerado (V001016)",
+    "Placa": "DHD-4656"
+  },
+  {
+    "Id": "30879379",
+    "FechaEntrada": "2026-03-06T15:36:31.3715611-05:00",
+    "FechaSalida": "2026-03-06T15:36:31.3715612-05:00",
+    "Tipo": "VISITANTE",
+    "Cedula": "",
+    "NombreCompleto": "Visitante (V001016)",
+    "Placa": "DHD-4656"
+  },
+  {
+    "Id": "0CBDA13B",
+    "FechaEntrada": "2026-03-09T15:19:48.8948601-05:00",
+    "FechaSalida": "2026-03-09T16:05:32.0327247-05:00",
+    "Tipo": "TAG",
+    "Cedula": "1000002",
+    "NombreCompleto": "AAAB Prueba Dos",
+    "Placa": ""
+  },
+  {
+    "Id": "1A57507D",
+    "FechaEntrada": "2026-03-09T15:52:29.8236184-05:00",
+    "FechaSalida": "2026-03-09T16:04:43.0359803-05:00",
+    "Tipo": "TAG",
+    "Cedula": "1000002",
+    "NombreCompleto": "AAAB Prueba Dos",
+    "Placa": ""
+  },
+  {
+    "Id": "F81792FF",
+    "FechaEntrada": "2026-03-09T15:52:44.3359398-05:00",
+    "FechaSalida": "2026-03-09T16:03:45.4746164-05:00",
+    "Tipo": "TAG",
+    "Cedula": "1000002",
+    "NombreCompleto": "AAAB Prueba Dos",
+    "Placa": ""
+  },
+  {
+    "Id": "B5051783",
+    "FechaEntrada": "2026-03-09T16:07:55.1361763-05:00",
+    "FechaSalida": "2026-03-09T16:08:11.628245-05:00",
+    "Tipo": "TAG",
+    "Cedula": "1000001",
+    "NombreCompleto": "AAAA Prueba Uno",
+    "Placa": "PBA-001"
+  },
+  {
+    "Id": "EDDED700",
+    "FechaEntrada": "2026-03-09T16:14:14.8984686-05:00",
+    "FechaSalida": "2026-03-09T16:14:14.8984687-05:00",
+    "Tipo": "TAG",
+    "Cedula": "1000001",
+    "NombreCompleto": "AAAA Prueba Uno",
+    "Placa": "PBA-001"
+  },
+  {
+    "Id": "37EE203D",
+    "FechaEntrada": "2026-03-09T16:34:29.6630352-05:00",
+    "FechaSalida": "2026-03-09T16:37:48.664681-05:00",
+    "Tipo": "VISITANTE",
+    "Cedula": "",
+    "NombreCompleto": "Visitante (V001001)",
+    "Placa": "TBK-9468"
+  },
+  {
+    "Id": "1506D305",
+    "FechaEntrada": "2026-03-09T16:38:05.2864792-05:00",
+    "FechaSalida": null,
+    "Tipo": "VISITANTE",
+    "Cedula": "",
+    "NombreCompleto": "Visitante (V001002)",
+    "Placa": "TBK-221"
+  },
+  {
+    "Id": "A9C7A659",
+    "FechaEntrada": "2026-03-09T16:38:54.0177992-05:00",
+    "FechaSalida": null,
+    "Tipo": "VISITANTE",
+    "Cedula": "",
+    "NombreCompleto": "Visitante (V001003)",
+    "Placa": "TBK-3882"
+  },
+  {
+    "Id": "39D8A463",
+    "FechaEntrada": "2026-03-09T16:48:12.7698419-05:00",
+    "FechaSalida": null,
+    "Tipo": "VISITANTE",
+    "Cedula": "",
+    "NombreCompleto": "Visitante (V001001)",
+    "Placa": "TBK-9477"
+  },
+  {
+    "Id": "BB0BA25C",
+    "FechaEntrada": "2026-03-09T16:51:49.7158128-05:00",
+    "FechaSalida": "2026-03-09T16:52:30.400311-05:00",
+    "Tipo": "VISITANTE",
+    "Cedula": "",
+    "NombreCompleto": "Visitante (V001001)",
+    "Placa": "TBK-8221"
+  }
+]

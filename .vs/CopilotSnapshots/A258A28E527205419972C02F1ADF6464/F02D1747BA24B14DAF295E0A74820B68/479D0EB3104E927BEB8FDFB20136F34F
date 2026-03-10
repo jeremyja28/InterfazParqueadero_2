@@ -1,0 +1,221 @@
+﻿using System;
+using System.Drawing;
+using System.Windows.Forms;
+
+namespace InterfazParqueadero
+{
+    public class MantenimientoForm : Form
+    {
+        private Label lblEstado = null!;
+        private NumericUpDown nudCantidad = null!;
+        private RadioButton rdCarro = null!;
+        private RadioButton rdMoto = null!;
+        private Button btnPoner = null!;
+        private Button btnHabilitar = null!;
+
+        private static readonly Color ColorRojo = Color.FromArgb(231, 49, 55);
+        private static readonly Color ColorVerde = Color.FromArgb(40, 167, 69);
+        private static readonly Color ColorAzul = Color.FromArgb(10, 40, 116);
+        private static readonly Color ColorNaranja = Color.FromArgb(230, 100, 20);
+        private static readonly Color ColorGrisFondo = Color.FromArgb(245, 245, 245);
+
+        private bool EsMoto => rdMoto.Checked;
+
+        public MantenimientoForm()
+        {
+            InicializarComponentes();
+            ActualizarEstado();
+        }
+
+        private void InicializarComponentes()
+        {
+            this.Text = "Gestion de Mantenimiento";
+            this.FormBorderStyle = FormBorderStyle.FixedDialog;
+            this.MaximizeBox = false;
+            this.MinimizeBox = false;
+            this.ClientSize = new Size(440, 380);   // +70 para selector
+            this.StartPosition = FormStartPosition.CenterParent;
+            this.BackColor = ColorGrisFondo;
+            this.Font = new Font("Segoe UI", 10F);
+
+            var lblTitulo = new Label
+            {
+                Text = "Gestion de Mantenimiento",
+                Font = new Font("Segoe UI", 13F, FontStyle.Bold),
+                ForeColor = ColorAzul,
+                BackColor = Color.White,
+                Dock = DockStyle.Top,
+                Height = 50,
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+
+            lblEstado = new Label
+            {
+                Text = "",
+                Font = new Font("Segoe UI", 10F),
+                ForeColor = Color.DimGray,
+                Location = new Point(20, 62),
+                Size = new Size(400, 22),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+
+            var lblCantidad = new Label
+            {
+                Text = "Cantidad de espacios:",
+                Font = new Font("Segoe UI", 10F),
+                ForeColor = Color.Black,
+                Location = new Point(20, 96),
+                Size = new Size(400, 22),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+
+            nudCantidad = new NumericUpDown
+            {
+                Minimum = 1,
+                Maximum = CapacidadService.CapacidadTotal,
+                Value = 1,
+                Font = new Font("Segoe UI", 24F, FontStyle.Bold),
+                Location = new Point(160, 122),
+                Size = new Size(120, 55),
+                TextAlign = HorizontalAlignment.Center
+            };
+
+            // ── Selector tipo de espacio ───────────────────────────────
+            var lblTipo = new Label
+            {
+                Text = "Tipo de espacio:",
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                ForeColor = Color.DimGray,
+                Location = new Point(20, 186),
+                Size = new Size(400, 20),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+
+            rdCarro = new RadioButton
+            {
+                Text = "🚗  Espacio de Carro  (máx. ÷113)",
+                Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
+                ForeColor = ColorAzul,
+                Location = new Point(60, 210),
+                AutoSize = true,
+                Checked = true,
+                Cursor = Cursors.Hand
+            };
+            rdCarro.CheckedChanged += (s, e) => ActualizarEstado();
+
+            rdMoto = new RadioButton
+            {
+                Text = "🏍️  Espacio de Moto  (máx. ÷16)",
+                Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
+                ForeColor = ColorNaranja,
+                Location = new Point(60, 238),
+                AutoSize = true,
+                Cursor = Cursors.Hand
+            };
+            rdMoto.CheckedChanged += (s, e) =>
+            {
+                nudCantidad.Maximum = rdMoto.Checked
+                    ? CapacidadService.CapacidadTotalMotos
+                    : CapacidadService.CapacidadTotal;
+                ActualizarEstado();
+            };
+
+            btnPoner = new Button
+            {
+                Text = "Enviar a Mantenimiento",
+                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+                ForeColor = Color.White,
+                BackColor = ColorRojo,
+                FlatStyle = FlatStyle.Flat,
+                Location = new Point(40, 264),
+                Size = new Size(360, 48),
+                Cursor = Cursors.Hand
+            };
+            btnPoner.FlatAppearance.BorderSize = 0;
+            btnPoner.Click += BtnPoner_Click;
+
+            btnHabilitar = new Button
+            {
+                Text = "Habilitar Espacios",
+                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+                ForeColor = Color.White,
+                BackColor = ColorVerde,
+                FlatStyle = FlatStyle.Flat,
+                Location = new Point(40, 322),
+                Size = new Size(360, 48),
+                Cursor = Cursors.Hand
+            };
+            btnHabilitar.FlatAppearance.BorderSize = 0;
+            btnHabilitar.Click += BtnHabilitar_Click;
+
+            this.Controls.AddRange(new Control[]
+            {
+                lblTitulo, lblEstado, lblCantidad,
+                nudCantidad,
+                lblTipo, rdCarro, rdMoto,
+                btnPoner, btnHabilitar
+            });
+        }
+
+        private void ActualizarEstado()
+        {
+            if (EsMoto)
+            {
+                lblEstado.Text =
+                    $"🏍️  En mant.: {CapacidadService.MotosEnMantenimiento}  |  " +
+                    $"Disponibles: {CapacidadService.MotosDisponibles}  |  " +
+                    $"Total motos: {CapacidadService.CapacidadTotalMotos}";
+            }
+            else
+            {
+                lblEstado.Text =
+                    $"🚗  En mant.: {CapacidadService.EnMantenimiento}  |  " +
+                    $"Disponibles: {CapacidadService.Disponibles}  |  " +
+                    $"Total carros: {CapacidadService.CapacidadTotal}";
+            }
+        }
+
+        private void BtnPoner_Click(object? sender, EventArgs e)
+        {
+            int n = (int)nudCantidad.Value;
+            bool ok = CapacidadService.AgregarMantenimiento(n, EsMoto);
+            if (!ok)
+            {
+                int disp = EsMoto ? CapacidadService.MotosDisponibles : CapacidadService.Disponibles;
+                MessageBox.Show(
+                    $"No hay suficientes espacios disponibles para enviar {n} a mantenimiento.\n" +
+                    $"Disponibles actualmente: {disp}",
+                    "Sin espacios disponibles",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
+            }
+            ActualizarEstado();
+            DialogResult = DialogResult.OK;
+        }
+
+        private void InitializeComponent()
+        {
+
+        }
+
+        private void BtnHabilitar_Click(object? sender, EventArgs e)
+        {
+            int n = (int)nudCantidad.Value;
+            bool ok = CapacidadService.QuitarMantenimiento(n, EsMoto);
+            if (!ok)
+            {
+                int enMant = EsMoto ? CapacidadService.MotosEnMantenimiento : CapacidadService.EnMantenimiento;
+                MessageBox.Show(
+                    $"No hay espacios suficientes en mantenimiento para habilitar {n}.\n" +
+                    $"En mantenimiento actualmente: {enMant}",
+                    "Sin espacios en mantenimiento",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
+            }
+            ActualizarEstado();
+            DialogResult = DialogResult.OK;
+        }
+    }
+}

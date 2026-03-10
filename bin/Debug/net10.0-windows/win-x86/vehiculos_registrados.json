@@ -8,6 +8,17 @@
     "TipoUsuario": "Docente",
     "Facultad": "vnifhaduidf",
     "LugarAsignado": 4,
-    "Activo": true
+    "Activo": false
+  },
+  {
+    "TagID": "3846769",
+    "Cedula": "1756827711",
+    "Nombres": "dddvvvfv",
+    "Apellidos": "afjvkndjcndakj",
+    "Placa": "DFD-5145",
+    "TipoUsuario": "Docente",
+    "Facultad": "dfdf",
+    "LugarAsignado": 1,
+    "Activo": false
   }
 ]

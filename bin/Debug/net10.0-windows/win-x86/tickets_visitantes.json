@@ -1,0 +1,15 @@
+{
+  "Contador": 1001,
+  "Tickets": [
+    {
+      "Codigo": "V001001",
+      "Placa": "TBK-8221",
+      "FechaEntrada": "2026-03-09T16:51:44.684652-05:00",
+      "FechaSalida": "2026-03-09T16:52:21.5486681-05:00",
+      "TotalPagar": 0.50,
+      "Activo": false,
+      "Observacion": null,
+      "EsMoto": false
+    }
+  ]
+}

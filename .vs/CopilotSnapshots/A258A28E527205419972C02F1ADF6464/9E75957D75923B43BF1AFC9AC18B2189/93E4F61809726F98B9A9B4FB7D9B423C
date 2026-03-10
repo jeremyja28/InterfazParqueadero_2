@@ -1,0 +1,399 @@
+﻿using System;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Windows.Forms;
+
+namespace InterfazParqueadero
+{
+    /// <summary>
+    /// Popup de confirmación para apertura manual de barrera.
+    /// 3 opciones principales: Carro | Moto | Paso Rápido.
+    /// El panel de detalles (dirección + espacios) se oculta cuando se elige Paso Rápido.
+    /// </summary>
+    public partial class AperturaManualForm : Form
+    {
+        // -- PALETA PUCESA --------------------------------------------------------
+        private static readonly Color C_FondoOscuro = Color.FromArgb(10,  40,  116);
+        private static readonly Color C_AzulInst    = Color.FromArgb(81,  127, 164);
+        private static readonly Color C_AzulAccent  = Color.FromArgb(115, 191, 213);
+        private static readonly Color C_Fondo       = Color.FromArgb(242, 242, 242);
+        private static readonly Color C_Blanco      = Color.White;
+        private static readonly Color C_Verde       = Color.FromArgb(40,  167, 69);
+        private static readonly Color C_Rojo        = Color.FromArgb(231, 49,  55);
+        private static readonly Color C_Texto       = Color.FromArgb(26,  35,  50);
+        private static readonly Color C_Gris        = Color.FromArgb(108, 117, 125);
+        private static readonly Color C_Naranja     = Color.FromArgb(243, 156, 18);
+
+        // -- CONTROLES ------------------------------------------------------------
+        private RadioButton   rdCarro       = null!;
+        private RadioButton   rdMoto        = null!;
+        private RadioButton   rdPasoRapido  = null!;
+        private Panel         panelDetalles = null!;
+        private Label         lblInfoPaso   = null!;
+        private RadioButton   rdEntrada     = null!;
+        private RadioButton   rdSalida      = null!;
+        private NumericUpDown numEspacios   = null!;
+
+        // -- PROPIEDADES PÚBLICAS -------------------------------------------------
+        /// <summary>0 para Paso Rápido; = 1 para Carro/Moto según NumericUpDown.</summary>
+        public int  EspaciosAfectados { get; private set; } = 1;
+        /// <summary>true = Entrada (ocupa espacio), false = Salida (libera espacio).</summary>
+        public bool EsEntrada         { get; private set; } = true;
+        /// <summary>true = Motocicleta.</summary>
+        public bool EsMoto            { get; private set; } = false;
+        /// <summary>true = Proveedor / Paso Rápido — no afecta el aforo.</summary>
+        public bool EsPasoRapido      { get; private set; } = false;
+
+        // -- CONSTRUCTOR ----------------------------------------------------------
+        public AperturaManualForm() 
+        { 
+            InitializeComponent(); 
+        }
+
+        private void AperturaManualForm_Load(object? sender, EventArgs e)
+        {
+            BuildUI();
+        }
+
+        // -- CONSTRUCCIÓN DE UI ---------------------------------------------------
+        private void BuildUI()
+        {
+            FormBorderStyle = FormBorderStyle.None;
+            StartPosition   = FormStartPosition.CenterParent;
+            Size            = new Size(460, 530);
+            BackColor       = C_Fondo;
+            KeyPreview      = true;
+            KeyDown        += (s, e) => { if (e.KeyCode == Keys.Escape) { DialogResult = DialogResult.Cancel; Close(); } };
+            Paint  += Form_Paint;
+            Shown  += (s, e) => AplicarRegionRedondeada();
+            Resize += (s, e) => AplicarRegionRedondeada();
+
+            // -- HEADER -----------------------------------------------------------
+            var panelHeader = new Panel { Dock = DockStyle.Top, Height = 72, BackColor = C_FondoOscuro };
+
+            panelHeader.Controls.Add(new Label
+            {
+                Text      = "?  Apertura Manual de Barrera",
+                Font      = new Font("Segoe UI", 15f, FontStyle.Bold),
+                ForeColor = C_Blanco,
+                AutoSize  = false,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Bounds    = new Rectangle(20, 0, 380, 72)
+            });
+
+            var btnX = new Button
+            {
+                Text      = "?",
+                Font      = new Font("Segoe UI", 11f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(180, 200, 230),
+                BackColor = Color.Transparent,
+                FlatStyle = FlatStyle.Flat,
+                Size      = new Size(38, 38),
+                Location  = new Point(panelHeader.Width - 48, 17),
+                Cursor    = Cursors.Hand,
+                Anchor    = AnchorStyles.Top | AnchorStyles.Right
+            };
+            btnX.FlatAppearance.BorderSize = 0;
+            btnX.Click += (s, e) => { DialogResult = DialogResult.Cancel; Close(); };
+            panelHeader.Controls.Add(btnX);
+            Controls.Add(panelHeader);
+
+            // -- CONTENIDO --------------------------------------------------------
+            var panelContent = new Panel
+            {
+                Location  = new Point(0, 72),
+                Size      = new Size(460, 458),
+                BackColor = C_Fondo
+            };
+            Controls.Add(panelContent);
+
+            int y = 14;
+
+            // -- Etiqueta superior ------------------------------------------------
+            panelContent.Controls.Add(new Label
+            {
+                Text      = "Seleccione el tipo de apertura:",
+                Font      = new Font("Segoe UI", 10f, FontStyle.Bold),
+                ForeColor = C_Gris,
+                AutoSize  = true,
+                Location  = new Point(20, y)
+            });
+            y += 28;
+
+            // ---------------------------------------------------------------------
+            // BLOQUE 1 — 3 RadioButton tipo toggle (Appearance.Button)
+            // Cada uno ocupa el ancho completo del formulario; borde de color.
+            // ---------------------------------------------------------------------
+            rdCarro = CrearOpcionTipo("??  Vehículo / Carro  (patio principal)", C_AzulInst, seleccionada: true);
+            rdCarro.Location = new Point(20, y);
+            y += 50;
+
+            rdMoto = CrearOpcionTipo("???  Motocicleta  (zona motos, máx. 16)", C_Naranja, seleccionada: false);
+            rdMoto.Location = new Point(20, y);
+            y += 50;
+
+            rdPasoRapido = CrearOpcionTipo("??  Proveedor / Paso Rápido  (sin cupo)", C_Gris, seleccionada: false);
+            rdPasoRapido.Location = new Point(20, y);
+            y += 50;
+
+            rdCarro.CheckedChanged      += TipoChanged;
+            rdMoto.CheckedChanged       += TipoChanged;
+            rdPasoRapido.CheckedChanged += TipoChanged;
+
+            panelContent.Controls.Add(rdCarro);
+            panelContent.Controls.Add(rdMoto);
+            panelContent.Controls.Add(rdPasoRapido);
+
+            // -- Separador --------------------------------------------------------
+            panelContent.Controls.Add(Sep(y)); y += 12;
+
+            // ---------------------------------------------------------------------
+            // BLOQUE 2 — Panel de detalles (dirección + espacios)
+            // Solo visible cuando Carro o Moto están seleccionados.
+            // ---------------------------------------------------------------------
+            panelDetalles = new Panel
+            {
+                Location  = new Point(20, y),
+                Size      = new Size(420, 130),
+                BackColor = C_Fondo,
+                Visible   = true
+            };
+            BuildPanelDetalles();
+            panelContent.Controls.Add(panelDetalles);
+
+            // -- Info Paso Rápido (mismo lugar que panelDetalles; alternan) -------
+            lblInfoPaso = new Label
+            {
+                Text      = "??  Sin aforo afectado.\n\nPresione CONFIRMAR para abrir la barrera.\nNo hay campos adicionales que completar.",
+                Font      = new Font("Segoe UI", 11f, FontStyle.Regular),
+                ForeColor = C_Gris,
+                AutoSize  = false,
+                Size      = new Size(420, 130),
+                Location  = new Point(20, y),
+                TextAlign = ContentAlignment.MiddleCenter,
+                BackColor = C_Blanco,
+                Visible   = false
+            };
+            panelContent.Controls.Add(lblInfoPaso);
+
+            y += 130 + 8;
+
+            // -- Separador --------------------------------------------------------
+            panelContent.Controls.Add(Sep(y)); y += 12;
+
+            // ---------------------------------------------------------------------
+            // BLOQUE 3 — Botón principal CONFIRMAR (ancho completo)
+            // ---------------------------------------------------------------------
+            var btnConfirmar = CrearBoton(
+                "?  CONFIRMAR Y ABRIR BARRERA",
+                new Rectangle(20, y, 420, 54),
+                C_Verde, C_Blanco,
+                new Font("Segoe UI", 13f, FontStyle.Bold));
+            btnConfirmar.Click += BtnConfirmar_Click;
+            panelContent.Controls.Add(btnConfirmar);
+            y += 62;
+
+            // -- Botón cancelar (centrado, más discreto) -----------------------
+            var btnCancelar = CrearBoton(
+                "?  Cancelar",
+                new Rectangle(160, y, 140, 36),
+                C_Rojo, C_Blanco,
+                new Font("Segoe UI", 10.5f, FontStyle.Regular));
+            btnCancelar.Click += (s, e) => { DialogResult = DialogResult.Cancel; Close(); };
+            panelContent.Controls.Add(btnCancelar);
+        }
+
+        // -- Construye el interior de panelDetalles -------------------------------
+        private void BuildPanelDetalles()
+        {
+            // "Dirección del movimiento:"
+            panelDetalles.Controls.Add(new Label
+            {
+                Text      = "Dirección del movimiento:",
+                Font      = new Font("Segoe UI", 10f, FontStyle.Bold),
+                ForeColor = C_Gris,
+                AutoSize  = true,
+                Location  = new Point(0, 6)
+            });
+
+            // rdEntrada y rdSalida en paralelo
+            rdEntrada = new RadioButton
+            {
+                Text      = "??  ENTRADA  (Ocupa espacio)",
+                Font      = new Font("Segoe UI", 10.5f, FontStyle.Bold),
+                ForeColor = C_Verde,
+                AutoSize  = true,
+                Location  = new Point(0, 30),
+                Checked   = true,
+                Cursor    = Cursors.Hand
+            };
+            rdSalida = new RadioButton
+            {
+                Text      = "??  SALIDA  (Libera espacio)",
+                Font      = new Font("Segoe UI", 10.5f, FontStyle.Bold),
+                ForeColor = C_AzulInst,
+                AutoSize  = true,
+                Location  = new Point(218, 30),
+                Cursor    = Cursors.Hand
+            };
+            panelDetalles.Controls.Add(rdEntrada);
+            panelDetalles.Controls.Add(rdSalida);
+
+            // Separador interno
+            panelDetalles.Controls.Add(new Panel
+            {
+                Location  = new Point(0, 62),
+                Size      = new Size(420, 1),
+                BackColor = Color.FromArgb(210, 215, 225)
+            });
+
+            // Etiqueta espacios
+            panelDetalles.Controls.Add(new Label
+            {
+                Text      = "Cantidad de espacios afectados:",
+                Font      = new Font("Segoe UI", 10f, FontStyle.Bold),
+                ForeColor = C_Gris,
+                AutoSize  = true,
+                Location  = new Point(0, 70)
+            });
+
+            // NumericUpDown grande y centrado
+            numEspacios = new NumericUpDown
+            {
+                Minimum     = 1,
+                Maximum     = 10,
+                Value       = 1,
+                Font        = new Font("Segoe UI", 20f, FontStyle.Bold),
+                TextAlign   = HorizontalAlignment.Center,
+                Size        = new Size(110, 42),
+                Location    = new Point(155, 90),
+                BackColor   = C_Blanco,
+                ForeColor   = C_FondoOscuro,
+                BorderStyle = BorderStyle.FixedSingle
+            };
+            panelDetalles.Controls.Add(numEspacios);
+        }
+
+        // -- Helper: separador horizontal -----------------------------------------
+        private static Panel Sep(int y) => new Panel
+        {
+            Location  = new Point(20, y),
+            Size      = new Size(420, 1),
+            BackColor = Color.FromArgb(210, 215, 225)
+        };
+
+        // -- Helper: RadioButton estilo toggle ------------------------------------
+        private RadioButton CrearOpcionTipo(string texto, Color acento, bool seleccionada)
+        {
+            var rd = new RadioButton
+            {
+                Text       = texto,
+                Font       = new Font("Segoe UI", 11.5f, FontStyle.Bold),
+                ForeColor  = acento,
+                Appearance = Appearance.Button,
+                FlatStyle  = FlatStyle.Flat,
+                TextAlign  = ContentAlignment.MiddleLeft,
+                Padding    = new Padding(14, 0, 0, 0),
+                Size       = new Size(420, 44),
+                Checked    = seleccionada,
+                Cursor     = Cursors.Hand,
+                BackColor  = seleccionada ? Color.FromArgb(235, 244, 255) : C_Blanco
+            };
+            rd.FlatAppearance.BorderColor        = acento;
+            rd.FlatAppearance.BorderSize         = 2;
+            rd.FlatAppearance.CheckedBackColor   = Color.FromArgb(235, 244, 255);
+            rd.FlatAppearance.MouseOverBackColor = Color.FromArgb(248, 251, 255);
+            // Actualizar BackColor también al cambiar estado
+            rd.CheckedChanged += (s, e) =>
+                rd.BackColor = rd.Checked ? Color.FromArgb(235, 244, 255) : C_Blanco;
+            return rd;
+        }
+
+        // -- Evento: cambio de tipo de apertura -----------------------------------
+        private void TipoChanged(object? sender, EventArgs e)
+        {
+            bool esPaso = rdPasoRapido.Checked;
+            panelDetalles.Visible = !esPaso;
+            lblInfoPaso.Visible   =  esPaso;
+        }
+
+        // -- Evento: CONFIRMAR -----------------------------------------------------
+        private void BtnConfirmar_Click(object? sender, EventArgs e)
+        {
+            if (rdPasoRapido.Checked)
+            {
+                EspaciosAfectados = 0;
+                EsEntrada         = true;
+                EsMoto            = false;
+                EsPasoRapido      = true;
+            }
+            else
+            {
+                EspaciosAfectados = (int)numEspacios.Value;
+                EsEntrada         = rdEntrada.Checked;
+                EsMoto            = rdMoto.Checked;
+                EsPasoRapido      = false;
+            }
+            DialogResult = DialogResult.OK;
+            Close();
+        }
+
+        // -- Fábrica de botones redondeados ----------------------------------------
+        private static Button CrearBoton(string texto, Rectangle bounds, Color fondo, Color textoColor, Font fuente)
+        {
+            var btn = new Button
+            {
+                Text      = texto,
+                Font      = fuente,
+                ForeColor = textoColor,
+                BackColor = fondo,
+                FlatStyle = FlatStyle.Flat,
+                Bounds    = bounds,
+                Cursor    = Cursors.Hand,
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+            btn.FlatAppearance.BorderSize         = 0;
+            btn.FlatAppearance.MouseOverBackColor = ControlPaint.Light(fondo, 0.15f);
+            btn.FlatAppearance.MouseDownBackColor = ControlPaint.Dark(fondo, 0.1f);
+            btn.Paint += (s, e) =>
+            {
+                var b = (Button)s!;
+                using var path  = ConstruirPath(b.ClientRectangle, 10);
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                using var brush = new SolidBrush(b.BackColor);
+                e.Graphics.FillPath(brush, path);
+                using var sf    = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                using var tf    = new SolidBrush(b.ForeColor);
+                e.Graphics.DrawString(b.Text, b.Font, tf, b.ClientRectangle, sf);
+            };
+            btn.Region = new Region(ConstruirPath(new Rectangle(0, 0, bounds.Width, bounds.Height), 10));
+            return btn;
+        }
+
+        // -- Dibujo: borde redondeado del formulario -------------------------------
+        private void Form_Paint(object? sender, PaintEventArgs e)
+        {
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            using var pen  = new Pen(Color.FromArgb(200, C_AzulInst), 1.5f);
+            using var path = ConstruirPath(new Rectangle(0, 0, Width - 1, Height - 1), 16);
+            e.Graphics.DrawPath(pen, path);
+        }
+
+        private void AplicarRegionRedondeada()
+        {
+            Region = new Region(ConstruirPath(new Rectangle(0, 0, Width, Height), 16));
+        }
+
+        private static GraphicsPath ConstruirPath(Rectangle rect, int radio)
+        {
+            var path = new GraphicsPath();
+            int d = radio * 2;
+            path.AddArc(rect.X,         rect.Y,          d, d, 180, 90);
+            path.AddArc(rect.Right - d, rect.Y,          d, d, 270, 90);
+            path.AddArc(rect.Right - d, rect.Bottom - d, d, d,   0, 90);
+            path.AddArc(rect.X,         rect.Bottom - d, d, d,  90, 90);
+            path.CloseFigure();
+            return path;
+        }
+    }
+}

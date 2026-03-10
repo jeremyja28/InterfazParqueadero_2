@@ -53,6 +53,37 @@ namespace InterfazParqueadero
         // Sidebar — botón activo actual
         private Button? _sidebarBtnActivo;
 
+        // ── RESUMEN DE CAJA ───────────────────────────────────────────────────────
+        private Label lblVisitantesCobrados = null!;
+        private Label lblTotalRecaudado = null!;
+
+        // ── ESCÁNER VISITANTES (salida directa desde dashboard) ───────────────────
+        private readonly System.Text.StringBuilder _visitorScanBuffer = new();
+        private DateTime _visitorLastKeyTime = DateTime.MinValue;
+        private System.Windows.Forms.Timer _visitorScanTimer = null!;
+        private string nombreImpresora = "EPSON TM-T20III Receipt";
+
+        // ── TARJETAS DE CAPACIDAD ────────────────────────────────────────────────
+        private Label lblCardDisponibles        = null!;
+        private Label lblCardMantenimiento      = null!;
+        private Label lblCardOcupados           = null!;
+        private Label lblCardTag                = null!;
+        private Label lblCardVisitante          = null!;
+        // Motos
+        private Label lblCardMotosDisp          = null!;
+        private Label lblCardMotosMantenimiento = null!;
+        private Label lblCardMotosOcupados      = null!;
+
+        // ── CONFIGURACIÓN BASE DE DATOS ──────────────────────────────────────────
+        private TextBox   txtDbServidor    = null!;
+        private TextBox   txtDbPuerto      = null!;
+        private TextBox   txtDbNombre      = null!;
+        private TextBox   txtDbUsuario     = null!;
+        private TextBox   txtDbPassword    = null!;
+        private Label     lblDbEstado      = null!;
+        private Label     lblSyncEstado    = null!;
+        private ComboBox  cmbIntervaloSync = null!;
+
         // ---------------------------------------------------------------
         // CONSTRUCTOR
         // ---------------------------------------------------------------
@@ -89,6 +120,212 @@ namespace InterfazParqueadero
             DataService.Inicializar();
 
             _sidebarBtnActivo = btnNavDashboard;
+            this.KeyPreview = true; // Captura global del escáner para salida de visitantes desde dashboard
+
+            // Timer del escáner: si no llega Enter, procesa el buffer 150 ms después del último carácter
+            _visitorScanTimer = new System.Windows.Forms.Timer { Interval = 150 };
+            _visitorScanTimer.Tick += (s, e) => { _visitorScanTimer.Stop(); ProcesarBufferEscaner(); };
+
+            InicializarResumenCaja();
+
+            // ── Capacidad global (Req 1 + Req 2) ─────────────────────────────────
+            CapacidadService.CargarEstado();
+            InicializarTarjetasCapacidad();
+
+            // ── Bitácora de accesos (AuditoriaService) ───────────────────────
+            AuditoriaService.Inicializar();
+            InicializarBotonHistorial();
+
+            // ── Caché de TAGs desde SQL DB (sin bloquear la UI) ──────────────
+            _ = TagCacheService.SincronizarDesdeDB();
+
+            // ── Panel de configuración de Base de Datos ───────────────────────
+            InicializarPanelConfigDB();
+
+            // ── Servicio de sincronización y respaldo local ───────────────────
+            SyncService.Inicializar(60); // intervalo por defecto: 1 hora
+            SyncService.OnSyncCompletada += SyncService_OnSyncResult;
+        }
+
+        // ---------------------------------------------------------------
+        // RESULTADO DE SINCRONIZACIÓN — actualizar UI
+        // ---------------------------------------------------------------
+        private void SyncService_OnSyncResult(SyncResult r)
+        {
+            if (InvokeRequired) { Invoke(() => SyncService_OnSyncResult(r)); return; }
+            if (lblSyncEstado is null) return;
+            lblSyncEstado.Text = r.Exito
+                ? $"✅  {DateTime.Now:HH:mm:ss}  |  {r.Mensaje}"
+                : $"❌  {r.Mensaje}";
+            lblSyncEstado.ForeColor = r.Exito ? ColorVerdeEsm : ColorRojoSuave;
+        }
+
+        // ---------------------------------------------------------------
+        // RESUMEN DE CAJA — Inicialización del panel derecho
+        // ---------------------------------------------------------------
+        private void InicializarResumenCaja()
+        {
+            // ── 1) Reducir panelHistorialAccesos a la mitad izquierda ──────────
+            int halfWidth   = (panelHistorialAccesos.Width - 8) / 2;
+            int rightWidth  = panelHistorialAccesos.Width - halfWidth - 8;
+            int rightX      = panelHistorialAccesos.Left + halfWidth + 8;
+
+            panelHistorialAccesos.Width  = halfWidth;
+            panelHistorialAccesos.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Bottom;
+
+            // ── 2) Crear panelResumenCaja (mitad derecha) ─────────────────────
+            var panelResumenCaja = new Panel
+            {
+                Name      = "panelResumenCaja",
+                Location  = new Point(rightX, panelHistorialAccesos.Top),
+                Size      = new Size(rightWidth, panelHistorialAccesos.Height),
+                Anchor    = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
+                BackColor = ColorCard,
+                AutoScroll = false
+            };
+            panelResumenCaja.Paint += (s, e) =>
+            {
+                using Pen pen = new Pen(Color.FromArgb(200, 215, 235), 1);
+                e.Graphics.DrawRectangle(pen, 0, 0, panelResumenCaja.Width - 1, panelResumenCaja.Height - 1);
+            };
+
+            // ── Título ────────────────────────────────────────────────────────
+            var lblTituloCaja = new Label
+            {
+                Text      = "\U0001F4B0 Resumen de Caja - Hoy",
+                Font      = new Font("Segoe UI", 11f, FontStyle.Bold),
+                ForeColor = ColorAzulOscuro,
+                Location  = new Point(16, 14),
+                Size      = new Size(420, 26),
+                BackColor = Color.Transparent
+            };
+            panelResumenCaja.Controls.Add(lblTituloCaja);
+
+            // Barra decorativa bajo el título
+            panelResumenCaja.Controls.Add(new Panel
+            {
+                Location  = new Point(16, 43),
+                Size      = new Size(60, 3),
+                BackColor = ColorAzulInst
+            });
+
+            // ── Card izquierda: Visitantes Cobrados ───────────────────────────
+            var cardCobros = new Panel
+            {
+                Location  = new Point(16, 60),
+                Size      = new Size(210, 100),
+                BackColor = Color.FromArgb(240, 246, 255)
+            };
+            cardCobros.Paint += (s, e) =>
+            {
+                using Pen p = new Pen(ColorAzulInst, 1);
+                e.Graphics.DrawRectangle(p, 0, 0, cardCobros.Width - 1, cardCobros.Height - 1);
+                using var bar = new SolidBrush(ColorAzulInst);
+                e.Graphics.FillRectangle(bar, 0, 0, 4, cardCobros.Height);
+            };
+            cardCobros.Controls.Add(new Label
+            {
+                Text      = "VISITANTES COBRADOS HOY",
+                Font      = new Font("Segoe UI", 7.5f, FontStyle.Bold),
+                ForeColor = ColorAzulInst,
+                Location  = new Point(12, 10),
+                AutoSize  = true,
+                BackColor = Color.Transparent
+            });
+            lblVisitantesCobrados = new Label
+            {
+                Text      = "0",
+                Font      = new Font("Segoe UI", 32f, FontStyle.Bold),
+                ForeColor = ColorAzulOscuro,
+                Location  = new Point(12, 32),
+                AutoSize  = true,
+                BackColor = Color.Transparent
+            };
+            cardCobros.Controls.Add(lblVisitantesCobrados);
+            panelResumenCaja.Controls.Add(cardCobros);
+
+            // ── Card derecha: Total Recaudado ─────────────────────────────────
+            var cardTotal = new Panel
+            {
+                Location  = new Point(242, 60),
+                Size      = new Size(210, 100),
+                BackColor = Color.FromArgb(237, 252, 243)
+            };
+            cardTotal.Paint += (s, e) =>
+            {
+                using Pen p = new Pen(ColorVerdeEsm, 1);
+                e.Graphics.DrawRectangle(p, 0, 0, cardTotal.Width - 1, cardTotal.Height - 1);
+                using var bar = new SolidBrush(ColorVerdeEsm);
+                e.Graphics.FillRectangle(bar, 0, 0, 4, cardTotal.Height);
+            };
+            cardTotal.Controls.Add(new Label
+            {
+                Text      = "TOTAL RECAUDADO HOY",
+                Font      = new Font("Segoe UI", 7.5f, FontStyle.Bold),
+                ForeColor = ColorVerdeEsm,
+                Location  = new Point(12, 10),
+                AutoSize  = true,
+                BackColor = Color.Transparent
+            });
+            lblTotalRecaudado = new Label
+            {
+                Text      = "$0.00",
+                Font      = new Font("Segoe UI", 24f, FontStyle.Bold),
+                ForeColor = ColorVerdeEsm,
+                Location  = new Point(12, 32),
+                AutoSize  = true,
+                BackColor = Color.Transparent
+            };
+            cardTotal.Controls.Add(lblTotalRecaudado);
+            panelResumenCaja.Controls.Add(cardTotal);
+
+            // ── Botón Ver Reportes ────────────────────────────────────────────
+            var btnVerReportes = new Button
+            {
+                Text      = "📊  Ver Reportes Completos",
+                Font      = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+                ForeColor = Color.White,
+                BackColor = ColorAzulInst,
+                FlatStyle = FlatStyle.Flat,
+                Location  = new Point(16, 175),
+                Size      = new Size(200, 34),
+                Cursor    = Cursors.Hand
+            };
+            btnVerReportes.FlatAppearance.BorderSize = 0;
+            btnVerReportes.Click += (s, e) =>
+            {
+                using var rForm = new ReportesVisitantesForm();
+                rForm.ShowDialog(this);
+            };
+            panelResumenCaja.Controls.Add(btnVerReportes);
+
+            // ── Agregar al mismo padre que panelHistorialAccesos ───────────────
+            panelHistorialAccesos.Parent!.Controls.Add(panelResumenCaja);
+        }
+
+        // ---------------------------------------------------------------
+        // RESUMEN DE CAJA — Lógica de cálculo diario
+        // ---------------------------------------------------------------
+        private void ActualizarResumenCajaDiaria()
+        {
+            try
+            {
+                var (tickets, _) = TicketStorageService.Cargar();
+                var hoy = tickets
+                    .Where(t => t.FechaSalida.HasValue && t.FechaSalida.Value.Date == DateTime.Today)
+                    .ToList();
+
+                int cobros  = hoy.Count;
+                decimal total = hoy.Sum(t => t.TotalPagar);
+
+                lblVisitantesCobrados.Text = cobros.ToString();
+                lblTotalRecaudado.Text     = $"${total:N2}";
+            }
+            catch
+            {
+                lblVisitantesCobrados.Text = "\u2014";
+                lblTotalRecaudado.Text     = "\u2014";
+            }
         }
 
         // ---------------------------------------------------------------
@@ -149,23 +386,128 @@ namespace InterfazParqueadero
             }
         }
 
+        // ── Menú lateral — 6 opciones ────────────────────────────────────────
+        private void InicializarBotonHistorial() => InicializarMenuLateral();
+
+        private Button? _btnLogsSistema;
+        private Button? _btnReportes;
+        private Button? _btnResetEstado;
+
+        private void InicializarMenuLateral()
+        {
+            // Ocultar botones del Designer que no forman parte del nuevo menú
+            btnNavMapaParking.Visible  = false;
+            btnNavIncidencias.Visible  = false;
+
+            // ── Reconfigurar botones Designer existentes ──────────────────────
+            // (1) Dashboard — sin cambios, permanece en y=108
+
+            // (2) Tickets Visitantes → y=150  (era btnTicketVisitante)
+            ConfigSidebarBtnDyn(btnTicketVisitante, "🎫  Tickets Visitantes", 150);
+            btnTicketVisitante.Click -= BtnTicketVisitante_Click;
+            btnTicketVisitante.Click += (s, e) => AbrirTicketVisitantes();
+
+            // (3) Registro de Tags → y=192  (era btnNavRegistroTags)
+            ConfigSidebarBtnDyn(btnNavRegistroTags, "🏷   Registro de Tags", 192);
+
+            // (4) Historial de Accesos → y=234  (reusa btnNavAuditoria)
+            ConfigSidebarBtnDyn(btnNavAuditoria, "📜  Historial de Accesos", 234);
+
+            // (5) Bitácora del Sistema → y=276  (nuevo botón dinámico)
+            _btnLogsSistema = CrearBtnSidebar("🖥   Bitácora del Sistema", 276);
+            _btnLogsSistema.Click += (s, e) =>
+            {
+                using var f = new LogsSistemaForm();
+                f.ShowDialog(this);
+            };
+            panelSidebar.Controls.Add(_btnLogsSistema);
+
+            // (6) Reportes / Corte de Caja → y=318  (nuevo botón dinámico)
+            _btnReportes = CrearBtnSidebar("📊  Reportes / Corte de Caja", 318);
+            _btnReportes.Click += (s, e) =>
+            {
+                using var f = new ReportesVisitantesForm();
+                f.ShowDialog(this);
+            };
+            panelSidebar.Controls.Add(_btnReportes);
+
+            // (7) Resetear Estado de Tags → y=360  (botón de emergencia admin)
+            _btnResetEstado = CrearBtnSidebar("🔄  Resetear Estado Tags", 360);
+            _btnResetEstado.ForeColor = Color.FromArgb(243, 156, 18);
+            _btnResetEstado.Click += (s, e) =>
+            {
+                var r = MessageBox.Show(
+                    "¿Resetear el estado de TODOS los tags a 'afuera'?\n\nUsar solo si el sistema indica mal la dirección.",
+                    "Resetear Estado", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                if (r == DialogResult.Yes)
+                {
+                    DataService.ResetearEstadoTodos();
+                    ManejarLog("🔄 Estado de tags reseteado — todos marcados como AFUERA", ZKTecoManager.TipoMensaje.Advertencia);
+                    AgregarAuditoria("Reset Estado Tags", "Administrador reseteó todos los estados de acceso a 'afuera'");
+                }
+            };
+            panelSidebar.Controls.Add(_btnResetEstado);
+
+            // Configuración → y=402 (ya está en Designer)
+        }
+
+        private static void ConfigSidebarBtnDyn(Button btn, string text, int y)
+        {
+            btn.Text     = text;
+            btn.Location = new Point(0, y);
+            btn.Visible  = true;
+        }
+
+        private static Button CrearBtnSidebar(string text, int y)
+        {
+            var btn = new Button
+            {
+                Text      = text,
+                Font      = new Font("Segoe UI", 10f),
+                ForeColor = Color.FromArgb(175, 200, 230),
+                BackColor = Color.Transparent,
+                FlatStyle = FlatStyle.Flat,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Padding   = new Padding(22, 0, 0, 0),
+                Location  = new Point(0, y),
+                Size      = new Size(250, 42),
+                Cursor    = Cursors.Hand
+            };
+            btn.FlatAppearance.BorderSize         = 0;
+            btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(15, 55, 110);
+            btn.FlatAppearance.MouseDownBackColor = Color.FromArgb(20, 70, 135);
+            btn.MouseEnter += (s, e) => { btn.ForeColor = Color.FromArgb(235, 245, 255); btn.BackColor = Color.FromArgb(12, 48, 98); };
+            btn.MouseLeave += (s, e) => { btn.ForeColor = Color.FromArgb(175, 200, 230); btn.BackColor = Color.Transparent; };
+            return btn;
+        }
+
         private void BtnNavDashboard_Click(object? sender, EventArgs e) => NavegarA("Dashboard", btnNavDashboard);
         private void BtnNavMapaParking_Click(object? sender, EventArgs e) => NavegarA("MapaParking", btnNavMapaParking);
         private void BtnNavRegistroTags_Click(object? sender, EventArgs e) => NavegarA("RegistroTags", btnNavRegistroTags);
         private void BtnNavIncidencias_Click(object? sender, EventArgs e) => NavegarA("Incidencias", btnNavIncidencias);
-        private void BtnNavAuditoria_Click(object? sender, EventArgs e) => NavegarA("Auditoria", btnNavAuditoria);
+        private void BtnNavAuditoria_Click(object? sender, EventArgs e)
+        {
+            using var h = new HistorialAccesosForm();
+            h.OnAbrirBarrera += () =>
+            {
+                zkManager?.LevantarBrazo();
+                MostrarBarreraArriba();
+                AgregarAuditoria("Apertura Manual (Historial)", $"Salida manual desde Historial — Op.: {NombreOperador}");
+                AuditoriaService.Registrar("BARRERA SUBIÓ", "MANUAL", "", $"Salida manual Historial — {NombreOperador}", "");
+            };
+            h.ShowDialog(this);
+        }
         private void BtnNavConfiguracion_Click(object? sender, EventArgs e) => NavegarA("Configuracion", btnNavConfiguracion);
 
         private void AbrirMapaParking()
         {
-            using var parkingForm = new ParkingSlotForm(GaritaAsignada);
-            parkingForm.OnIncidenciaRegistrada = (tipo, desc) =>
+            using var mantForm = new MantenimientoForm();
+            if (mantForm.ShowDialog(this) == DialogResult.OK)
             {
-                AgregarAuditoria(tipo, desc);
-                AgregarAuditoria(tipo, desc);
-            };
-            parkingForm.ShowDialog(this);
-            // Volver a dashboard después de cerrar
+                ActualizarTarjetasCapacidad();
+                string accion = $"Mantenimiento actualizado — En mantenimiento: {CapacidadService.EnMantenimiento}, Disponibles: {CapacidadService.Disponibles}";
+                AgregarAuditoria("Mantenimiento", accion);
+            }
             NavegarA("Dashboard", btnNavDashboard);
         }
 
@@ -179,6 +521,239 @@ namespace InterfazParqueadero
             };
             tagForm.ShowDialog(this);
             NavegarA("Dashboard", btnNavDashboard);
+        }
+
+        // ---------------------------------------------------------------
+        // TARJETAS DE CAPACIDAD — Dashboard (Req 2)
+        // ---------------------------------------------------------------
+
+        /// <summary>
+        /// Crea el panel de capacidad en 2 filas (Carros / Motos) + panel lateral
+        /// de ocupación (Con Tag / Visitantes) y lo inserta en el dashboard.
+        /// </summary>
+        private void InicializarTarjetasCapacidad()
+        {
+            const int rowH          = 130;   // altura de cada fila de tarjetas
+            const int rowLabelH     = 22;    // altura de la etiqueta de fila
+            const int rowSpacing    = 8;     // separación entre fila 1 y fila 2
+            const int sideWidth     = 175;   // ancho del panel lateral de ocupación
+            const int outerH        = rowLabelH + rowH + rowSpacing + rowLabelH + rowH + 4;
+
+            // Desplazar panelAccesoVisual para dejar espacio al contenedor más alto
+            panelAccesoVisual.Location = new Point(
+                panelAccesoVisual.Location.X,
+                panelAccesoVisual.Location.Y + outerH + 14);
+
+            int containerTop   = panelControl.Location.Y + panelControl.Height + 10;
+            int containerWidth = panelControl.Width;
+
+            // Outer panel — contenedor global
+            var outer = new Panel
+            {
+                Location  = new Point(panelControl.Location.X, containerTop),
+                Size      = new Size(containerWidth, outerH),
+                Anchor    = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+                BackColor = Color.Transparent
+            };
+            panelPagDashboard.Controls.Add(outer);
+
+            int gridWidth = containerWidth - sideWidth - 8;
+
+            // ── Fila 1 — CARROS ────────────────────────────────────────────────
+            outer.Controls.Add(new Label
+            {
+                Text      = "🚗  CARROS",
+                Font      = new Font("Segoe UI", 9f, FontStyle.Bold),
+                ForeColor = ColorAzulOscuro,
+                Location  = new Point(0, 0), AutoSize = true,
+                BackColor = Color.Transparent
+            });
+
+            var tableCarros = new TableLayoutPanel
+            {
+                Location        = new Point(0, rowLabelH),
+                Size            = new Size(gridWidth, rowH),
+                ColumnCount     = 4, RowCount = 1,
+                BackColor       = Color.Transparent,
+                Padding         = new Padding(0),
+                CellBorderStyle = TableLayoutPanelCellBorderStyle.None
+            };
+            tableCarros.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25f));
+            tableCarros.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25f));
+            tableCarros.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25f));
+            tableCarros.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25f));
+            tableCarros.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+            outer.Controls.Add(tableCarros);
+
+            Label dummyTotalCarros;
+            tableCarros.Controls.Add(
+                CrearTarjetaCapacidad("🚗 TOTAL CARROS", CapacidadService.CapacidadTotal.ToString(),
+                    "Capacidad máxima", ColorAzulOscuro, out dummyTotalCarros), 0, 0);
+            tableCarros.Controls.Add(
+                CrearTarjetaCapacidad("DISPONIBLES", CapacidadService.Disponibles.ToString(),
+                    "Espacios libres", ColorVerdeEsm, out lblCardDisponibles), 1, 0);
+            tableCarros.Controls.Add(
+                CrearTarjetaCapacidad("OCUPADOS", CapacidadService.TotalOcupados.ToString(),
+                    "Vehículos adentro", ColorAzulInst, out lblCardOcupados), 2, 0);
+            tableCarros.Controls.Add(
+                CrearTarjetaCapacidad("MANTENIMIENTO", CapacidadService.EnMantenimiento.ToString(),
+                    "Fuera de servicio", ColorRojoSuave, out lblCardMantenimiento), 3, 0);
+
+            // ── Fila 2 — MOTOS ─────────────────────────────────────────────────
+            int row2Top = rowLabelH + rowH + rowSpacing;
+            outer.Controls.Add(new Label
+            {
+                Text      = "🏍️  MOTOS",
+                Font      = new Font("Segoe UI", 9f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(25, 135, 84),
+                Location  = new Point(0, row2Top), AutoSize = true,
+                BackColor = Color.Transparent
+            });
+
+            var tableMotos = new TableLayoutPanel
+            {
+                Location        = new Point(0, row2Top + rowLabelH),
+                Size            = new Size(gridWidth, rowH),
+                ColumnCount     = 4, RowCount = 1,
+                BackColor       = Color.Transparent,
+                Padding         = new Padding(0),
+                CellBorderStyle = TableLayoutPanelCellBorderStyle.None
+            };
+            tableMotos.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25f));
+            tableMotos.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25f));
+            tableMotos.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25f));
+            tableMotos.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25f));
+            tableMotos.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+            outer.Controls.Add(tableMotos);
+
+            Label dummyTotalMotos;
+            tableMotos.Controls.Add(
+                CrearTarjetaCapacidad("🏍️ TOTAL MOTOS", CapacidadService.CapacidadTotalMotos.ToString(),
+                    "Capacidad máxima", Color.FromArgb(52, 100, 158), out dummyTotalMotos), 0, 0);
+            tableMotos.Controls.Add(
+                CrearTarjetaCapacidad("DISPONIBLES", CapacidadService.MotosDisponibles.ToString(),
+                    "Espacios moto libres", Color.FromArgb(25, 135, 84), out lblCardMotosDisp), 1, 0);
+            tableMotos.Controls.Add(
+                CrearTarjetaCapacidad("OCUPADOS", CapacidadService.MotosAdentro.ToString(),
+                    "Motos adentro", Color.FromArgb(52, 100, 158), out lblCardMotosOcupados), 2, 0);
+            tableMotos.Controls.Add(
+                CrearTarjetaCapacidad("MANTENIMIENTO", CapacidadService.MotosEnMantenimiento.ToString(),
+                    "Motos fuera de servicio", ColorRojoSuave, out lblCardMotosMantenimiento), 3, 0);
+
+            // ── Panel lateral — OCUPACIÓN ───────────────────────────────────────
+            var sidePanel = new Panel
+            {
+                Location  = new Point(gridWidth + 8, 0),
+                Size      = new Size(sideWidth, outerH),
+                BackColor = Color.Transparent
+            };
+            outer.Controls.Add(sidePanel);
+
+            sidePanel.Controls.Add(new Label
+            {
+                Text      = "OCUPACIÓN",
+                Font      = new Font("Segoe UI", 9f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(60, 70, 90),
+                Location  = new Point(0, 0), AutoSize = true,
+                BackColor = Color.Transparent
+            });
+
+            var tableOcup = new TableLayoutPanel
+            {
+                Location        = new Point(0, rowLabelH),
+                Size            = new Size(sideWidth, outerH - rowLabelH),
+                ColumnCount     = 1, RowCount = 2,
+                BackColor       = Color.Transparent,
+                Padding         = new Padding(0),
+                CellBorderStyle = TableLayoutPanelCellBorderStyle.None
+            };
+            tableOcup.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+            tableOcup.RowStyles.Add(new RowStyle(SizeType.Percent, 50f));
+            tableOcup.RowStyles.Add(new RowStyle(SizeType.Percent, 50f));
+            sidePanel.Controls.Add(tableOcup);
+
+            tableOcup.Controls.Add(
+                CrearTarjetaCapacidad("CON TAG", CapacidadService.AdentroTag.ToString(),
+                    "Registrados adentro", ColorAzulInst, out lblCardTag), 0, 0);
+            tableOcup.Controls.Add(
+                CrearTarjetaCapacidad("VISITANTES", CapacidadService.AdentroVisitante.ToString(),
+                    "Tickets activos", Color.FromArgb(230, 100, 20), out lblCardVisitante), 0, 1);
+        }
+
+        /// <summary>Construye una tarjeta de estado con título, valor grande y subtítulo.</summary>
+        private static Panel CrearTarjetaCapacidad(
+            string titulo, string valorInicial, string subtitulo,
+            Color colorFondo, out Label lblValorRef)
+        {
+            var card = new Panel
+            {
+                Dock      = DockStyle.Fill,
+                BackColor = colorFondo,
+                Margin    = new Padding(6)
+            };
+            card.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                using var pen = new Pen(Color.FromArgb(55, Color.White), 1.5f);
+                e.Graphics.DrawRectangle(pen, 0, 0, card.Width - 1, card.Height - 1);
+            };
+
+            var lblTit = new Label
+            {
+                Text      = titulo,
+                Font      = new Font("Segoe UI", 8.5f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(210, 255, 255, 255),
+                AutoSize  = true,
+                Location  = new Point(16, 11),
+                BackColor = Color.Transparent
+            };
+            var lblVal = new Label
+            {
+                Text      = valorInicial,
+                Font      = new Font("Segoe UI", 38f, FontStyle.Bold),
+                ForeColor = Color.White,
+                AutoSize  = true,
+                Location  = new Point(14, 28),
+                BackColor = Color.Transparent
+            };
+            var lblSub = new Label
+            {
+                Text      = subtitulo,
+                Font      = new Font("Segoe UI", 8f),
+                ForeColor = Color.FromArgb(185, 255, 255, 255),
+                AutoSize  = true,
+                Location  = new Point(16, 98),
+                BackColor = Color.Transparent
+            };
+            card.Controls.AddRange(new Control[] { lblTit, lblVal, lblSub });
+            lblValorRef = lblVal;
+            return card;
+        }
+
+        /// <summary>
+        /// Actualiza las tarjetas de capacidad con los valores actuales del CapacidadService.
+        /// Debe llamarse después de cada entrada, salida o cambio de mantenimiento.
+        /// </summary>
+        public void ActualizarTarjetasCapacidad()
+        {
+            if (lblCardDisponibles        == null) return;
+            if (lblCardOcupados           == null) return;
+            if (lblCardMantenimiento      == null) return;
+            if (lblCardTag                == null) return;
+            if (lblCardVisitante          == null) return;
+            if (lblCardMotosDisp          == null) return;
+            if (lblCardMotosOcupados      == null) return;
+            if (lblCardMotosMantenimiento == null) return;
+
+            lblCardDisponibles.Text        = CapacidadService.Disponibles.ToString();
+            lblCardOcupados.Text           = CapacidadService.TotalOcupados.ToString();
+            lblCardMantenimiento.Text      = CapacidadService.EnMantenimiento.ToString();
+            lblCardTag.Text                = CapacidadService.AdentroTag.ToString();
+            lblCardVisitante.Text          = CapacidadService.AdentroVisitante.ToString();
+            lblCardMotosDisp.Text          = CapacidadService.MotosDisponibles.ToString();
+            lblCardMotosOcupados.Text      = CapacidadService.MotosAdentro.ToString();
+            lblCardMotosMantenimiento.Text = CapacidadService.MotosEnMantenimiento.ToString();
+            // NOTA REPORTES: EntradasDiaTag / EntradasDiaVisitante / EntradasDiaMoto
         }
 
         // ---------------------------------------------------------------
@@ -403,131 +978,29 @@ namespace InterfazParqueadero
                 ProcesarLecturaTarjeta(puertaID, eventoID, logCompleto);
 
                 // -----------------------------------------------------------
-                // Obtener info de la tarjeta para TODOS los eventos RFID
+                // Autorización — DB primero, fallback a caché/JSON
                 // -----------------------------------------------------------
-                if (partes.Length >= 6 && !string.IsNullOrEmpty(numeroTarjeta) && numeroTarjeta != "0")
+                if (!string.IsNullOrEmpty(numeroTarjeta) && numeroTarjeta != "0")
                 {
-                    string estado = partes[5].Trim(); // 0=IN (entrada), 1=OUT (salida)
+                    // Dirección: leer de partes[5] si el log es completo;
+                    // si no, inferir por puertaID (par = salida, impar = entrada)
+                    string estado = (partes.Length >= 6)
+                        ? partes[5].Trim()
+                        : (puertaID % 2 == 0 ? "1" : "0");
 
-                    // ? ANTI-REBOTE: Ignorar lecturas duplicadas en menos de 5 segundos ?
+                    // Anti-rebote
                     TimeSpan tiempoTranscurrido = DateTime.Now - ultimaLecturaTime;
                     if (numeroTarjeta == ultimaTarjetaLeida &&
-                        puertaID == ultimoPuertaID &&
-                        tiempoTranscurrido.TotalSeconds < 5)
+                        tiempoTranscurrido.TotalSeconds < 10)
                     {
-                        ManejarLog($"?? Lectura duplicada ignorada ({tiempoTranscurrido.TotalSeconds:F1}s) - Anti-rebote activo", ZKTecoManager.TipoMensaje.Advertencia);
+                        ManejarLog($"\u26d4 Evento duplicado ignorado ({tiempoTranscurrido.TotalSeconds:F1}s) - Anti-rebote activo", ZKTecoManager.TipoMensaje.Advertencia);
                         return;
                     }
-
-                    // Actualizar última lectura
                     ultimaTarjetaLeida = numeroTarjeta;
-                    ultimoPuertaID = puertaID;
-                    ultimaLecturaTime = DateTime.Now;
+                    ultimoPuertaID     = puertaID;
+                    ultimaLecturaTime  = DateTime.Now;
 
-                    // Obtener info de la tarjeta (BD local)
-                    var vehiculoLocal = DataService.BuscarPorTag(numeroTarjeta);
-                    string nombreUsuario = vehiculoLocal?.Nombre ?? "Usuario InBIO";
-                    bool autorizadoLocal = vehiculoLocal != null;
-
-                    // Determinar dirección: estado "0" = ENTRADA, estado "1" = SALIDA
-                    bool esSalida = estado == "1" || (puertaID == 2 && estado == "1");
-                    string direccion = esSalida ? "SALIDA" : "ENTRADA";
-
-                    // ??? VALIDACIÓN DE ESTADO — Prevenir doble entrada/salida ???
-                    if (vehiculoLocal != null)
-                    {
-                        bool estaAdentro = DataService.EstaAdentro(numeroTarjeta);
-                        if (!esSalida && estaAdentro)
-                        {
-                            ManejarLog($"?? TAG {numeroTarjeta} ({nombreUsuario}) YA ESTÁ ADENTRO — Entrada duplicada ignorada", ZKTecoManager.TipoMensaje.Advertencia);
-                            AgregarAuditoria("Entrada Duplicada", $"{nombreUsuario} — TAG {numeroTarjeta} ya registrado dentro");
-                            return;
-                        }
-                        if (esSalida && !estaAdentro)
-                        {
-                            ManejarLog($"?? TAG {numeroTarjeta} ({nombreUsuario}) NO REGISTRÓ ENTRADA — Salida duplicada ignorada", ZKTecoManager.TipoMensaje.Advertencia);
-                            AgregarAuditoria("Salida Duplicada", $"{nombreUsuario} — TAG {numeroTarjeta} sin entrada registrada");
-                            return;
-                        }
-                    }
-
-                    // ??? CONTROL AUTOMÁTICO DE BARRERA ???
-                    if (eventoID == 0 || eventoID == 20 || eventoID == 29) // Acceso concedido por el InBIO o autenticado internamente
-                    {
-                        if (!autorizadoLocal)
-                        {
-                            ManejarLog($"?? DENEGADO: Tarjeta {numeroTarjeta} autorizada por InBIO pero NO está en base local — Barrera NO se abre", ZKTecoManager.TipoMensaje.Advertencia);
-                            AgregarAuditoria("Acceso Denegado (No en BD local)", $"Tarjeta {numeroTarjeta} — aprobada por InBIO pero sin registro local");
-                            return;
-                        }
-
-                        // ? CONTROL DE BARRERA SEGÚN DIRECCIÓN ?
-                        if (!esSalida)
-                        {
-                            // ENTRADA: Reader 1/3 ? Activa LOCK 1
-                            ManejarLog($"?? ? AUTORIZADO: {nombreUsuario} (Tarjeta {numeroTarjeta}) - ENTRADA", ZKTecoManager.TipoMensaje.Exito);
-                            AgregarAuditoria("Acceso Autorizado (Entrada)", $"{nombreUsuario} — Tarjeta {numeroTarjeta}");
-                            zkManager.LevantarBrazo(puerta: 1);
-                            MostrarBarreraArriba();
-                            if (vehiculoLocal != null)
-                            {
-                                DataService.RegistrarEntrada(numeroTarjeta);
-                                ActualizarAccesoVisual(vehiculoLocal, "ENTRADA");
-                                AgregarIngresoSalida("ENTRADA", vehiculoLocal);
-                            }
-                        }
-                        else
-                        {
-                            // SALIDA: Reader 2/4 ? Activa LOCK 1 con cancelarLock2=true
-                            ManejarLog($"?? ? AUTORIZADO: {nombreUsuario} (Tarjeta {numeroTarjeta}) - SALIDA", ZKTecoManager.TipoMensaje.Exito);
-                            AgregarAuditoria("Acceso Autorizado (Salida)", $"{nombreUsuario} — Tarjeta {numeroTarjeta}");
-                            zkManager.LevantarBrazo(puerta: 1, cancelarLock2: true);
-                            MostrarBarreraArriba();
-                            if (vehiculoLocal != null)
-                            {
-                                DataService.RegistrarSalida(numeroTarjeta);
-                                ActualizarAccesoVisual(vehiculoLocal, "SALIDA");
-                                AgregarIngresoSalida("SALIDA", vehiculoLocal);
-                            }
-                        }
-                    }
-                    else if (eventoID == 1 && autorizadoLocal)
-                    {
-                        // ??? DENEGADO POR INBIO PERO AUTORIZADO EN BD LOCAL ???
-                        // La tarjeta está registrada en nuestro sistema pero no en el panel InBIO
-                        // ? Abrir barrera por autorización local (override)
-                        ManejarLog($"?? ? AUTORIZADO (BD Local): {nombreUsuario} (Tarjeta {numeroTarjeta}) - {direccion}", ZKTecoManager.TipoMensaje.Exito);
-                        AgregarAuditoria($"Acceso por BD Local ({direccion})", $"{nombreUsuario} — Tarjeta {numeroTarjeta} (Override InBIO)");
-
-                        if (!esSalida)
-                        {
-                            zkManager.LevantarBrazo(puerta: 1);
-                        }
-                        else
-                        {
-                            zkManager.LevantarBrazo(puerta: 1, cancelarLock2: true);
-                        }
-                        MostrarBarreraArriba();
-                        if (vehiculoLocal != null)
-                        {
-                            if (!esSalida) DataService.RegistrarEntrada(numeroTarjeta);
-                            else DataService.RegistrarSalida(numeroTarjeta);
-                            ActualizarAccesoVisual(vehiculoLocal, direccion);
-                            AgregarIngresoSalida(direccion, vehiculoLocal);
-                        }
-                    }
-                    else if (eventoID == 1)
-                    {
-                        // Denegado y NO está en ninguna BD local
-                        ManejarLog($"?? Tarjeta {numeroTarjeta} rechazada — No registrada en InBIO ni en BD local", ZKTecoManager.TipoMensaje.Advertencia);
-                        AgregarAuditoria("Acceso Denegado", $"Tarjeta {numeroTarjeta} rechazada");
-                    }
-                }
-                else if (eventoID == 1 && !string.IsNullOrEmpty(numeroTarjeta) && numeroTarjeta != "0")
-                {
-                    // Formato incompleto pero con tarjeta — reportar denegación
-                    ManejarLog($"?? Tarjeta {numeroTarjeta} rechazada por el InBIO", ZKTecoManager.TipoMensaje.Advertencia);
-                    AgregarAuditoria("Acceso Denegado", $"Tarjeta {numeroTarjeta} rechazada");
+                    _ = ProcesarTagAutorizacionAsync(puertaID, eventoID, numeroTarjeta, estado);
                 }
 
                 return; // Ya procesado
@@ -539,12 +1012,14 @@ namespace InterfazParqueadero
             if (puertaID == 1 && eventoID == 202)
             {
                 ManejarLog($"? ¡Button1 presionado! Ejecutando apertura...", ZKTecoManager.TipoMensaje.Exito);
-                if (zkManager.LevantarBrazo()) { MostrarBarreraArriba();   }
+                AgregarAuditoria("Apertura Remota (Button1)", $"Control remoto InBIO activado — Op.: {NombreOperador}");
+                AuditoriaService.Registrar("BARRERA SUBIÓ", "REMOTO", "", $"Button1 InBIO — {NombreOperador}", "");
+                if (zkManager.LevantarBrazo()) { MostrarBarreraArriba(); }
                 return;
             }
 
             // --------------------------------------------------------------
-            // ?? EXIT BUTTON VARIANT (Evento 27/28) — Salida por JSON local
+            // ?? EXIT BUTTON VARIANT (Evento 27/28) — Salida con lookup en BD
             // --------------------------------------------------------------
             if (eventoID == 27 || eventoID == 28)
             {
@@ -562,38 +1037,24 @@ namespace InterfazParqueadero
 
                 if (!string.IsNullOrEmpty(tarjetaE27) && tarjetaE27 != "0")
                 {
-                    // Solo buscar en DataService (vehículos registrados)
-                    var vehiculoLocal = DataService.BuscarPorTag(tarjetaE27);
-
-                    if (vehiculoLocal != null)
+                    // Anti-rebote
+                    TimeSpan tiempoE27 = DateTime.Now - ultimaLecturaTime;
+                    if (tarjetaE27 == ultimaTarjetaLeida && puertaID == ultimoPuertaID && tiempoE27.TotalSeconds < 10)
                     {
-                        // Anti-rebote para E27
-                        TimeSpan tiempoE27 = DateTime.Now - ultimaLecturaTime;
-                        if (tarjetaE27 == ultimaTarjetaLeida && puertaID == ultimoPuertaID && tiempoE27.TotalSeconds < 5)
-                        {
-                            ManejarLog($"?? E27 duplicado ignorado ({tiempoE27.TotalSeconds:F1}s) - Anti-rebote", ZKTecoManager.TipoMensaje.Advertencia);
-                            return;
-                        }
-                        ultimaTarjetaLeida = tarjetaE27;
-                        ultimoPuertaID = puertaID;
-                        ultimaLecturaTime = DateTime.Now;
-
-                        string nombre = vehiculoLocal?.Nombre ?? "Usuario";
-                        ManejarLog($"?? ? AUTORIZADO vía BD local: {nombre} (Tarjeta {tarjetaE27}) - SALIDA (E27)", ZKTecoManager.TipoMensaje.Exito);
-                        AgregarAuditoria("Salida Autorizada (E27)", $"{nombre} — Tarjeta {tarjetaE27}");
-                        zkManager.LevantarBrazo(puerta: 1, cancelarLock2: true);
-                        MostrarBarreraArriba();
-                        if (vehiculoLocal != null)
-                        {
-                            DataService.RegistrarSalida(tarjetaE27);
-                            ActualizarAccesoVisual(vehiculoLocal, "SALIDA");
-                            AgregarIngresoSalida("SALIDA", vehiculoLocal);
-                        }
+                        ManejarLog($"⛔ E{eventoID} duplicado ignorado ({tiempoE27.TotalSeconds:F1}s) - Anti-rebote", ZKTecoManager.TipoMensaje.Advertencia);
                         return;
                     }
-                }
+                    ultimaTarjetaLeida = tarjetaE27;
+                    ultimoPuertaID = puertaID;
+                    ultimaLecturaTime = DateTime.Now;
 
-                ManejarLog($"?? E{eventoID} sin autorización en BD local - Ignorando", ZKTecoManager.TipoMensaje.Informacion);
+                    // Delegar a ProcesarTagAutorizacionAsync con estado=salida (reutiliza lookup en BD)
+                    _ = ProcesarTagAutorizacionAsync(puertaID, 0, tarjetaE27, "1");
+                }
+                else
+                {
+                    ManejarLog($"?? E{eventoID} sin tarjeta identificada", ZKTecoManager.TipoMensaje.Informacion);
+                }
                 return;
             }
 
@@ -646,7 +1107,104 @@ namespace InterfazParqueadero
         };
 
         // ---------------------------------------------------------------
-        // ?? PROCESAMIENTO DE LECTURAS DE TARJETAS RFID
+        // LOG ASÍNCRONO A SQL — RegistrosAcceso (no bloquea la UI)
+        // ---------------------------------------------------------------
+        private static async Task LogAccesoSQLAsync(
+            string tagCode, int puerta, string tipoEvento, string tipoIngreso,
+            TagInfo? tagInfo, VehicleInfo? vehiculo)
+        {
+            try
+            {
+                string connStr = DatabaseConfigService.BuildConnectionString();
+                await using var conn = new Microsoft.Data.SqlClient.SqlConnection(connStr);
+                await conn.OpenAsync();
+
+                string cedula = tagInfo?.Cedula ?? vehiculo?.Cedula ?? "";
+                string nombre = tagInfo?.NombreCompleto ?? vehiculo?.Nombre ?? "";
+                string placa  = tagInfo?.Placa ?? vehiculo?.Placa ?? "";
+                string rol    = tagInfo?.Rol ?? "";
+                string unidad = tagInfo?.UnidadAcademica ?? "";
+                int?   usoId  = tagInfo?.UsoParqueaderoId > 0 ? tagInfo.UsoParqueaderoId : (int?)null;
+
+                if (tipoEvento == "SALIDA")
+                {
+                    // Buscar el último registro de ENTRADA sin FechaSalida y cerrarla
+                    const string updSql = @"
+                        UPDATE TOP (1) RegistrosAcceso
+                        SET    FechaSalida = GETDATE()
+                        WHERE  TagCode     = @Tag
+                          AND  TipoEvento  = 'ENTRADA'
+                          AND  FechaSalida IS NULL";
+                    await using var updCmd = new Microsoft.Data.SqlClient.SqlCommand(updSql, conn);
+                    updCmd.Parameters.AddWithValue("@Tag", tagCode);
+                    int filas = await updCmd.ExecuteNonQueryAsync();
+
+                    // Si no había entrada abierta, insertar igual como registro de salida
+                    if (filas == 0)
+                    {
+                        await InsertarRegistroAcceso(conn, tagCode, puerta, "SALIDA",
+                            tipoIngreso, usoId, cedula, nombre, placa, rol, unidad);
+                    }
+                }
+                else
+                {
+                    await InsertarRegistroAcceso(conn, tagCode, puerta, tipoEvento,
+                        tipoIngreso, usoId, cedula, nombre, placa, rol, unidad);
+                }
+            }
+            catch
+            {
+                // DB no disponible — guardar localmente para sync posterior
+                string cedula = tagInfo?.Cedula ?? vehiculo?.Cedula ?? "";
+                string nombre = tagInfo?.NombreCompleto ?? vehiculo?.Nombre ?? "";
+                string placa  = tagInfo?.Placa ?? vehiculo?.Placa ?? "";
+                int?   usoId  = tagInfo?.UsoParqueaderoId > 0 ? tagInfo.UsoParqueaderoId : (int?)null;
+
+                _ = SyncService.GuardarPendiente(new RegistroAccesoLocal
+                {
+                    TagCode          = tagCode,
+                    Puerta           = puerta,
+                    TipoEvento       = tipoEvento,
+                    TipoIngreso      = tipoIngreso,
+                    FechaEntrada     = DateTime.Now,
+                    UsoParqueaderoId = usoId,
+                    Cedula           = cedula,
+                    NombreCompleto   = nombre,
+                    Placa            = placa,
+                    RolDescripcion   = tagInfo?.Rol ?? "",
+                    UnidadAcademica  = tagInfo?.UnidadAcademica ?? "",
+                });
+            }
+        }
+
+        private static async Task InsertarRegistroAcceso(
+            Microsoft.Data.SqlClient.SqlConnection conn,
+            string tagCode, int puerta, string tipoEvento, string tipoIngreso,
+            int? usoId, string cedula, string nombre, string placa, string rol, string unidad)
+        {
+            const string ins = @"
+                INSERT INTO RegistrosAcceso
+                    (TagCode, Puerta, TipoEvento, TipoIngreso,
+                     UsoParqueaderoId, Cedula, NombreCompleto, Placa, RolDescripcion, UnidadAcademica)
+                VALUES
+                    (@Tag, @Puerta, @Tipo, @Ingreso,
+                     @UsoId, @Ced, @Nombre, @Placa, @Rol, @Unidad)";
+            await using var cmd = new Microsoft.Data.SqlClient.SqlCommand(ins, conn);
+            cmd.Parameters.AddWithValue("@Tag",    tagCode);
+            cmd.Parameters.AddWithValue("@Puerta", puerta);
+            cmd.Parameters.AddWithValue("@Tipo",   tipoEvento);
+            cmd.Parameters.AddWithValue("@Ingreso", tipoIngreso);
+            cmd.Parameters.AddWithValue("@UsoId",  (object?)usoId ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@Ced",    string.IsNullOrEmpty(cedula) ? DBNull.Value : (object)cedula);
+            cmd.Parameters.AddWithValue("@Nombre", string.IsNullOrEmpty(nombre) ? DBNull.Value : (object)nombre);
+            cmd.Parameters.AddWithValue("@Placa",  string.IsNullOrEmpty(placa)  ? DBNull.Value : (object)placa);
+            cmd.Parameters.AddWithValue("@Rol",    string.IsNullOrEmpty(rol)    ? DBNull.Value : (object)rol);
+            cmd.Parameters.AddWithValue("@Unidad", string.IsNullOrEmpty(unidad) ? DBNull.Value : (object)unidad);
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        // ---------------------------------------------------------------
+        // PROCESAMIENTO DE LECTURAS DE TARJETAS RFID
         // ---------------------------------------------------------------
         private void ProcesarLecturaTarjeta(int puertaID, int eventoID, string logCompleto)
         {
@@ -731,35 +1289,202 @@ namespace InterfazParqueadero
 
         private void ActualizarSnapshot(string tagId)
         {
+            // 1. Buscar en JSON local
             VehicleInfo? info = DataService.BuscarPorTag(tagId);
-            if (info == null)
+            if (info != null)
             {
-                lblSnapshotTitulo.Text = "? TAG NO REGISTRADO";
-                lblSnapshotTitulo.ForeColor = ColorDorado;
-                lblTagID.Text = $"Tag: {tagId}";
-                lblNombreUsuario.Text = "No encontrado";
-                lblPlacaVehiculo.Text = "—";
-                lblTipoUsuario.Text = "Desconocido";
-                lblFacultad.Text = "";
-                pictureBoxUsuario.Image = DataService.GenerarFotoPlaceholder("?", Color.Gray, 90, 110);
+                lblSnapshotTitulo.Text     = "✅ ACCESO IDENTIFICADO";
+                lblSnapshotTitulo.ForeColor = ColorVerdeEsm;
+                lblTagID.Text              = $"Tag: {info.TagID}";
+                lblNombreUsuario.Text      = info.Nombre;
+                lblPlacaVehiculo.Text      = $"Placa: {info.Placa}";
+                lblTipoUsuario.Text        = info.TipoUsuario;
+                lblTipoUsuario.ForeColor   = info.ColorTipo;
+                lblFacultad.Text           = info.Facultad;
+                pictureBoxUsuario.Image    = DataService.GenerarFotoPlaceholder(info.Nombre, info.ColorTipo, 90, 110);
+                // NOTA: No llamamos ActualizarAccesoVisual aquí; el handler RFID lo hace con la dirección correcta.
                 return;
             }
 
-            lblSnapshotTitulo.Text = "? ACCESO IDENTIFICADO";
-            lblSnapshotTitulo.ForeColor = ColorVerdeEsm;
-            lblTagID.Text = $"Tag: {info.TagID}";
-            lblNombreUsuario.Text = info.Nombre;
-            lblPlacaVehiculo.Text = $"Placa: {info.Placa}";
-            lblTipoUsuario.Text = info.TipoUsuario;
-            lblTipoUsuario.ForeColor = info.ColorTipo;
-            lblFacultad.Text = info.Facultad;
-            pictureBoxUsuario.Image = DataService.GenerarFotoPlaceholder(info.Nombre, info.ColorTipo, 90, 110);
+            // 2. Buscar en caché SQL (usuarios registrados solo en BD)
+            var tagSQL = TagCacheService.BuscarTag(tagId);
+            if (tagSQL != null)
+            {
+                bool activo = tagSQL.Activo;
+                lblSnapshotTitulo.Text      = activo
+                    ? "✅ IDENTIFICADO — BD"
+                    : "⛔ INACTIVO / NO AUTORIZADO";
+                lblSnapshotTitulo.ForeColor = activo ? ColorVerdeEsm : ColorRojoSuave;
+                lblTagID.Text               = $"Tag: {tagId}";
+                lblNombreUsuario.Text       = tagSQL.NombreCompleto;
+                lblPlacaVehiculo.Text       = string.IsNullOrWhiteSpace(tagSQL.Placa) ? "Sin placa" : $"Placa: {tagSQL.Placa}";
+                lblTipoUsuario.Text         = activo ? tagSQL.Rol : "INACTIVO — sin acceso";
+                lblTipoUsuario.ForeColor    = activo ? ColorAzulInst : ColorRojoSuave;
+                lblFacultad.Text            = tagSQL.UnidadAcademica;
+                pictureBoxUsuario.Image     = DataService.GenerarFotoPlaceholder(
+                    tagSQL.NombreCompleto, activo ? ColorVerdeEsm : ColorRojoSuave, 90, 110);
+                return;
+            }
 
-            // NOTA: No llamamos ActualizarAccesoVisual aquí porque
-            // el handler principal de eventos (ZkManager_OnEventoHardware)
-            // lo llama con la dirección correcta (ENTRADA/SALIDA).
-            // Evitamos duplicar y siempre mostrar "ENTRADA".
+            // 3. TAG completamente desconocido
+            lblSnapshotTitulo.Text      = "⚠ TAG NO REGISTRADO";
+            lblSnapshotTitulo.ForeColor = ColorDorado;
+            lblTagID.Text               = $"Tag: {tagId}";
+            lblNombreUsuario.Text       = "No encontrado en ninguna BD";
+            lblPlacaVehiculo.Text       = "—";
+            lblTipoUsuario.Text         = "Desconocido";
+            lblTipoUsuario.ForeColor    = ColorDorado;
+            lblFacultad.Text            = "";
+            pictureBoxUsuario.Image     = DataService.GenerarFotoPlaceholder("?", Color.Gray, 90, 110);
         }
+
+        /// <summary>Muestra en el snapshot panel que el acceso fue denegado.</summary>
+        private void MostrarSnapshotDenegado(string tagId, TagInfo? tagSQL)
+        {
+            lblSnapshotTitulo.Text      = "⛔ ACCESO DENEGADO";
+            lblSnapshotTitulo.ForeColor = ColorRojoSuave;
+            lblTagID.Text               = $"Tag: {tagId}";
+            if (tagSQL != null)
+            {
+                lblNombreUsuario.Text   = tagSQL.NombreCompleto;
+                lblPlacaVehiculo.Text   = string.IsNullOrWhiteSpace(tagSQL.Placa) ? "Sin placa" : $"Placa: {tagSQL.Placa}";
+                lblTipoUsuario.Text     = "INACTIVO — sin acceso";
+                lblTipoUsuario.ForeColor = ColorRojoSuave;
+                lblFacultad.Text        = tagSQL.UnidadAcademica;
+                pictureBoxUsuario.Image = DataService.GenerarFotoPlaceholder(tagSQL.NombreCompleto, ColorRojoSuave, 90, 110);
+            }
+            else
+            {
+                lblNombreUsuario.Text   = "TAG no registrado";
+                lblPlacaVehiculo.Text   = "—";
+                lblTipoUsuario.Text     = "Sin acceso";
+                lblTipoUsuario.ForeColor = ColorRojoSuave;
+                lblFacultad.Text        = "";
+                pictureBoxUsuario.Image = DataService.GenerarFotoPlaceholder("✕", ColorRojoSuave, 90, 110);
+            }
+        }
+
+        // -----------------------------------------------------------------------
+        // AUTORIZACIÓN RFID ASYNC — DB primero, fallback a caché/JSON
+        // -----------------------------------------------------------------------
+        private async Task ProcesarTagAutorizacionAsync(int puertaID, int eventoID,
+                                                         string numeroTarjeta, string estado)
+        {
+            // 1. JSON local (instantáneo — vehículos del archivo local)
+            var vehiculoLocal = DataService.BuscarPorTag(numeroTarjeta);
+
+            // 2. BD SQL: revisa caché; si no está, hace query directo a la BD para este tag
+            var tagInfoSQL = await TagCacheService.BuscarTagConFallbackDBAsync(numeroTarjeta);
+
+            string nombreUsuario = vehiculoLocal?.Nombre
+                                   ?? tagInfoSQL?.NombreCompleto
+                                   ?? "Usuario InBIO";
+
+            bool autorizadoLocal = vehiculoLocal != null || tagInfoSQL?.Activo == true;
+
+            bool   esSalida  = estado == "1";
+            string direccion = esSalida ? "SALIDA" : "ENTRADA";
+
+            ManejarLog($"[RFID] Tarjeta={numeroTarjeta} Puerta={puertaID} InOut={estado} → {direccion}",
+                       ZKTecoManager.TipoMensaje.Informacion);
+
+            // VehicleInfo para display visual (SQL-only users usan objeto sintético)
+            VehicleInfo? infoDisplay = vehiculoLocal
+                ?? (tagInfoSQL != null ? ConstruirVehicleInfoDesdeSql(tagInfoSQL, numeroTarjeta) : null);
+
+            if (eventoID == 0 || eventoID == 20 || eventoID == 29)
+            {
+                if (!autorizadoLocal)
+                {
+                    string motivo = tagInfoSQL != null
+                        ? $"TAG en sistema pero NO ACTIVO/PAGADO — {tagInfoSQL.NombreCompleto}"
+                        : "sin registro en ninguna base de datos";
+                    ManejarLog($"⛔ DENEGADO: Tarjeta {numeroTarjeta} — {motivo}", ZKTecoManager.TipoMensaje.Advertencia);
+                    AgregarAuditoria("Acceso Denegado", $"Tarjeta {numeroTarjeta} — {motivo}");
+                    MostrarBarreraAbajo();
+                    MostrarSnapshotDenegado(numeroTarjeta, tagInfoSQL);
+                    return;
+                }
+
+                if (!esSalida)
+                {
+                    ManejarLog($"✅ AUTORIZADO: {nombreUsuario} (Tarjeta {numeroTarjeta}) - ENTRADA", ZKTecoManager.TipoMensaje.Exito);
+                    AgregarAuditoria("Acceso Autorizado (Entrada)", $"{nombreUsuario} — Tarjeta {numeroTarjeta}");
+                    AuditoriaService.Registrar("ENTRÓ", "TAG",
+                        vehiculoLocal?.Cedula ?? tagInfoSQL?.Cedula ?? "", nombreUsuario,
+                        vehiculoLocal?.Placa  ?? tagInfoSQL?.Placa  ?? "");
+                    zkManager.LevantarBrazo(puerta: 1);
+                    MostrarBarreraArriba();
+                    _ = LogAccesoSQLAsync(numeroTarjeta, puertaID, "ENTRADA", "AUTOMATICO", tagInfoSQL, vehiculoLocal);
+                    if (vehiculoLocal != null) DataService.RegistrarEntrada(numeroTarjeta);
+                    CapacidadService.RegistrarEntradaTag();
+                    ActualizarTarjetasCapacidad();
+                    if (infoDisplay != null) { ActualizarAccesoVisual(infoDisplay, "ENTRADA"); AgregarIngresoSalida("ENTRADA", infoDisplay); }
+                }
+                else
+                {
+                    ManejarLog($"✅ AUTORIZADO: {nombreUsuario} (Tarjeta {numeroTarjeta}) - SALIDA", ZKTecoManager.TipoMensaje.Exito);
+                    AgregarAuditoria("Acceso Autorizado (Salida)", $"{nombreUsuario} — Tarjeta {numeroTarjeta}");
+                    AuditoriaService.Registrar("SALIÓ", "TAG",
+                        vehiculoLocal?.Cedula ?? tagInfoSQL?.Cedula ?? "", nombreUsuario,
+                        vehiculoLocal?.Placa  ?? tagInfoSQL?.Placa  ?? "");
+                    zkManager.LevantarBrazo(puerta: 1, cancelarLock2: true);
+                    MostrarBarreraArriba();
+                    _ = LogAccesoSQLAsync(numeroTarjeta, puertaID, "SALIDA", "AUTOMATICO", tagInfoSQL, vehiculoLocal);
+                    if (vehiculoLocal != null) DataService.RegistrarSalida(numeroTarjeta);
+                    CapacidadService.RegistrarSalidaTag();
+                    ActualizarTarjetasCapacidad();
+                    if (infoDisplay != null) { ActualizarAccesoVisual(infoDisplay, "SALIDA"); AgregarIngresoSalida("SALIDA", infoDisplay); }
+                }
+            }
+            else if (eventoID == 1 && autorizadoLocal)
+            {
+                // InBIO denegó (tarjeta no en whitelist del panel) pero está en BD → override
+                ManejarLog($"⚠️ AUTORIZADO (BD): {nombreUsuario} (Tarjeta {numeroTarjeta}) - {direccion}",
+                           ZKTecoManager.TipoMensaje.Exito);
+                AgregarAuditoria($"Acceso por BD ({direccion})",
+                    $"{nombreUsuario} — Tarjeta {numeroTarjeta} (Override InBIO)");
+                AuditoriaService.Registrar(esSalida ? "SALIÓ" : "ENTRÓ", "TAG",
+                    vehiculoLocal?.Cedula ?? tagInfoSQL?.Cedula ?? "", nombreUsuario,
+                    vehiculoLocal?.Placa  ?? tagInfoSQL?.Placa  ?? "");
+                if (!esSalida) zkManager.LevantarBrazo(puerta: 1);
+                else           zkManager.LevantarBrazo(puerta: 1, cancelarLock2: true);
+                MostrarBarreraArriba();
+                _ = LogAccesoSQLAsync(numeroTarjeta, puertaID, direccion, "AUTOMATICO", tagInfoSQL, vehiculoLocal);
+                if (vehiculoLocal != null)
+                {
+                    if (!esSalida) DataService.RegistrarEntrada(numeroTarjeta);
+                    else           DataService.RegistrarSalida(numeroTarjeta);
+                }
+                if (!esSalida) CapacidadService.RegistrarEntradaTag();
+                else           CapacidadService.RegistrarSalidaTag();
+                ActualizarTarjetasCapacidad();
+                if (infoDisplay != null) { ActualizarAccesoVisual(infoDisplay, direccion); AgregarIngresoSalida(direccion, infoDisplay); }
+            }
+            else if (eventoID == 1)
+            {
+                ManejarLog($"⛔ Tarjeta {numeroTarjeta} rechazada — No registrada en BD ni en caché",
+                           ZKTecoManager.TipoMensaje.Advertencia);
+                AgregarAuditoria("Acceso Denegado", $"Tarjeta {numeroTarjeta} rechazada");
+                MostrarBarreraAbajo();
+                MostrarSnapshotDenegado(numeroTarjeta, null);
+            }
+        }
+
+        /// <summary>Construye un VehicleInfo básico desde un TagInfo de SQL para
+        /// alimentar los métodos visuales.</summary>
+        private static VehicleInfo ConstruirVehicleInfoDesdeSql(TagInfo info, string tagId) =>
+            new VehicleInfo
+            {
+                TagID       = tagId,
+                Cedula      = info.Cedula,
+                Nombres     = info.NombreCompleto,
+                Apellidos   = "",
+                Placa       = info.Placa,
+                TipoUsuario = string.IsNullOrWhiteSpace(info.Rol) ? "BD" : info.Rol,
+                Facultad    = info.UnidadAcademica,
+                Activo      = info.Activo,
+            };
 
         private void LimpiarSnapshot()
         {
@@ -858,6 +1583,8 @@ namespace InterfazParqueadero
             ActualizarInfoRol();
             ActualizarEstadoConexion(zkManager.EstaConectado);
             toolStripStatusLabel.Text = $"  Sistema de Control — {GaritaAsignada} — {NombreOperador} — iniciado.";
+            ActualizarResumenCajaDiaria();
+            ActualizarTarjetasCapacidad();
         }
 
         private void BtnConectar_Click(object? sender, EventArgs e)
@@ -885,6 +1612,296 @@ namespace InterfazParqueadero
                     btnConectar.Text = "DESCONECTAR";
                     btnConectar.BackColor = ColorRojoSuave;
                 }
+            }
+        }
+
+        // ---------------------------------------------------------------
+        // 🗄️ CONFIGURACIÓN BASE DE DATOS — Panel y eventos
+        // ---------------------------------------------------------------
+
+        /// <summary>
+        /// Crea el GroupBox de configuración de BD y lo añade a panelPagConfiguracion
+        /// justo debajo del panel de configuración del InBIO 206.
+        /// </summary>
+        private void InicializarPanelConfigDB()
+        {
+            DatabaseConfigService.Cargar();
+            var cfg = DatabaseConfigService.Config;
+
+            var gbDB = new GroupBox
+            {
+                Text      = "  🗄️  Conexión Base de Datos SQL Server  ",
+                Location  = new Point(20, 116),
+                Size      = new Size(1060, 118),
+                Anchor    = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+                Font      = new Font("Segoe UI", 9f, FontStyle.Bold),
+                ForeColor = ColorAzulInst,
+                BackColor = ColorCard,
+                FlatStyle = FlatStyle.Flat,
+            };
+
+            // ── Fila 1: campos —————————————————————————————————————————
+            gbDB.Controls.Add(DbLbl("Servidor:", 18, 32));
+            txtDbServidor = DbTxt(cfg.Servidor, 85, 28, 185);
+            gbDB.Controls.Add(txtDbServidor);
+
+            gbDB.Controls.Add(DbLbl("Puerto:", 285, 32));
+            txtDbPuerto = DbTxt(cfg.Puerto.ToString(), 340, 28, 65);
+            gbDB.Controls.Add(txtDbPuerto);
+
+            gbDB.Controls.Add(DbLbl("Base de Datos:", 422, 32));
+            txtDbNombre = DbTxt(cfg.BaseDatos, 530, 28, 155);
+            gbDB.Controls.Add(txtDbNombre);
+
+            gbDB.Controls.Add(DbLbl("Usuario:", 700, 32));
+            txtDbUsuario = DbTxt(cfg.Usuario, 758, 28, 120);
+            gbDB.Controls.Add(txtDbUsuario);
+
+            gbDB.Controls.Add(DbLbl("Contraseña:", 893, 32));
+            txtDbPassword = DbTxt(cfg.Password, 970, 28, 78);
+            txtDbPassword.PasswordChar = '●';
+            gbDB.Controls.Add(txtDbPassword);
+
+            // ── Fila 2: botones y label de estado ——————————————————————
+            var btnGuardar = new Button
+            {
+                Text      = "💾  GUARDAR",
+                Font      = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+                ForeColor = Color.White,
+                BackColor = ColorAzulInst,
+                FlatStyle = FlatStyle.Flat,
+                Location  = new Point(18, 70),
+                Size      = new Size(130, 34),
+                Cursor    = Cursors.Hand,
+            };
+            btnGuardar.FlatAppearance.BorderSize = 0;
+            btnGuardar.Click += BtnGuardarConfigDB_Click;
+            gbDB.Controls.Add(btnGuardar);
+
+            var btnProbar = new Button
+            {
+                Text      = "🔌  PROBAR CONEXIÓN",
+                Font      = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+                ForeColor = Color.White,
+                BackColor = ColorAzulOscuro,
+                FlatStyle = FlatStyle.Flat,
+                Location  = new Point(158, 70),
+                Size      = new Size(190, 34),
+                Cursor    = Cursors.Hand,
+            };
+            btnProbar.FlatAppearance.BorderSize = 0;
+            btnProbar.Click += BtnProbarConexionDB_Click;
+            gbDB.Controls.Add(btnProbar);
+
+            lblDbEstado = new Label
+            {
+                Text      = "⚪  Sin probar",
+                Font      = new Font("Segoe UI", 9f),
+                ForeColor = Color.Gray,
+                Location  = new Point(362, 78),
+                AutoSize  = true,
+                BackColor = Color.Transparent,
+            };
+            gbDB.Controls.Add(lblDbEstado);
+            panelPagConfiguracion.Controls.Add(gbDB);
+
+            // ── SINCRONIZACIÓN Y RESPALDO ──────────────────────────────────────
+            var gbSync = new GroupBox
+            {
+                Text      = "  🔄  Sincronización y Respaldo Local  ",
+                Location  = new Point(20, 244),
+                Size      = new Size(1060, 108),
+                Anchor    = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+                Font      = new Font("Segoe UI", 9f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(30, 110, 50),
+                BackColor = ColorCard,
+                FlatStyle = FlatStyle.Flat,
+            };
+
+            gbSync.Controls.Add(DbLbl("Auto-sync:", 18, 36));
+            cmbIntervaloSync = new ComboBox
+            {
+                Location      = new Point(90, 32),
+                Size          = new Size(175, 26),
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Font          = new Font("Segoe UI", 9.5f),
+            };
+            cmbIntervaloSync.Items.AddRange(new object[]
+            {
+                "Manual (solo botón)",
+                "Cada 30 minutos",
+                "Cada 1 hora",
+                "Cada 2 horas",
+                "Cada 6 horas",
+                "Cada 12 horas",
+            });
+            cmbIntervaloSync.SelectedIndex = 2; // default = 1 hora
+            cmbIntervaloSync.SelectedIndexChanged += (s, e) =>
+            {
+                int[] mins = { 0, 30, 60, 120, 360, 720 };
+                SyncService.ConfigurarAutoSync(mins[cmbIntervaloSync.SelectedIndex]);
+            };
+            gbSync.Controls.Add(cmbIntervaloSync);
+
+            var btnSincronizar = new Button
+            {
+                Text      = "🔄  Sincronizar ahora",
+                Font      = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+                ForeColor = Color.White,
+                BackColor = Color.FromArgb(30, 110, 50),
+                FlatStyle = FlatStyle.Flat,
+                Location  = new Point(278, 28),
+                Size      = new Size(190, 34),
+                Cursor    = Cursors.Hand,
+            };
+            btnSincronizar.FlatAppearance.BorderSize = 0;
+            btnSincronizar.Click += async (s, e) =>
+            {
+                btnSincronizar.Enabled = false;
+                btnSincronizar.Text    = "⏳  Sincronizando...";
+                lblSyncEstado.Text     = "⏳  Conectando con la base de datos...";
+                lblSyncEstado.ForeColor = ColorDorado;
+                var r = await SyncService.SincronizarAsync();
+                btnSincronizar.Enabled = true;
+                btnSincronizar.Text    = "🔄  Sincronizar ahora";
+            };
+            gbSync.Controls.Add(btnSincronizar);
+
+            var btnSoloSubir = new Button
+            {
+                Text      = "⬆️  Solo subir pendientes",
+                Font      = new Font("Segoe UI", 9f),
+                ForeColor = Color.White,
+                BackColor = Color.FromArgb(160, 90, 15),
+                FlatStyle = FlatStyle.Flat,
+                Location  = new Point(478, 28),
+                Size      = new Size(190, 34),
+                Cursor    = Cursors.Hand,
+            };
+            btnSoloSubir.FlatAppearance.BorderSize = 0;
+            btnSoloSubir.Click += async (s, e) =>
+            {
+                btnSoloSubir.Enabled  = false;
+                lblSyncEstado.Text    = "⏳  Subiendo registros pendientes...";
+                lblSyncEstado.ForeColor = ColorDorado;
+                int n = await SyncService.SubirSoloPendientesAsync();
+                lblSyncEstado.Text      = $"✅  Subidos {n} registros.  Pendientes restantes: {SyncService.PendientesCount}";
+                lblSyncEstado.ForeColor = ColorVerdeEsm;
+                btnSoloSubir.Enabled  = true;
+            };
+            gbSync.Controls.Add(btnSoloSubir);
+
+            lblSyncEstado = new Label
+            {
+                Text      = $"⚪  Sin sincronizar  |  ⏳ Pendientes locales: {SyncService.PendientesCount}",
+                Font      = new Font("Segoe UI", 9f),
+                ForeColor = Color.DimGray,
+                Location  = new Point(18, 72),
+                Size      = new Size(1020, 22),
+                BackColor = Color.Transparent,
+            };
+            gbSync.Controls.Add(lblSyncEstado);
+
+            panelPagConfiguracion.Controls.Add(gbSync);
+        }
+
+        private static Label DbLbl(string text, int x, int y) =>
+            new Label
+            {
+                Text      = text,
+                Font      = new Font("Segoe UI", 9f),
+                ForeColor = ColorTexto,
+                Location  = new Point(x, y),
+                AutoSize  = true,
+                BackColor = Color.Transparent,
+            };
+
+        private static TextBox DbTxt(string valor, int x, int y, int w) =>
+            new TextBox
+            {
+                Text        = valor,
+                Font        = new Font("Segoe UI", 10f),
+                Location    = new Point(x, y),
+                Size        = new Size(w, 28),
+                BorderStyle = BorderStyle.FixedSingle,
+            };
+
+        private void BtnGuardarConfigDB_Click(object? sender, EventArgs e)
+        {
+            if (!int.TryParse(txtDbPuerto.Text, out int puerto)) puerto = 1433;
+
+            var cfg = new DatabaseConfig
+            {
+                Servidor  = txtDbServidor.Text.Trim(),
+                Puerto    = puerto,
+                BaseDatos = txtDbNombre.Text.Trim(),
+                Usuario   = txtDbUsuario.Text.Trim(),
+                Password  = txtDbPassword.Text,
+            };
+
+            DatabaseConfigService.Guardar(cfg);
+
+            lblDbEstado.Text      = "✅  Configuración guardada correctamente";
+            lblDbEstado.ForeColor = ColorVerdeEsm;
+
+            AgregarAuditoria("Config BD Guardada",
+                $"Servidor={cfg.Servidor}:{cfg.Puerto}  BD={cfg.BaseDatos}  Usuario={cfg.Usuario}");
+        }
+
+        private async void BtnProbarConexionDB_Click(object? sender, EventArgs e)
+        {
+            if (!int.TryParse(txtDbPuerto.Text, out int puerto)) puerto = 1433;
+
+            var cfg = new DatabaseConfig
+            {
+                Servidor  = txtDbServidor.Text.Trim(),
+                Puerto    = puerto,
+                BaseDatos = txtDbNombre.Text.Trim(),
+                Usuario   = txtDbUsuario.Text.Trim(),
+                Password  = txtDbPassword.Text,
+            };
+
+            lblDbEstado.Text      = "⏳  Probando conexión...";
+            lblDbEstado.ForeColor = ColorDorado;
+
+            string serverCs = cfg.Servidor.Contains('\\') || cfg.Servidor.Contains('/')
+                ? cfg.Servidor
+                : $"{cfg.Servidor},{cfg.Puerto}";
+            string cs = $"Server={serverCs};" +
+                        $"Database={cfg.BaseDatos};" +
+                        $"User Id={cfg.Usuario};" +
+                        $"Password={cfg.Password};" +
+                        $"TrustServerCertificate=True;" +
+                        $"Connect Timeout=8;";
+
+            bool ok   = false;
+            string err = "";
+
+            try
+            {
+                await System.Threading.Tasks.Task.Run(() =>
+                {
+                    using var conn = new Microsoft.Data.SqlClient.SqlConnection(cs);
+                    conn.Open();
+                });
+                ok = true;
+            }
+            catch (Exception ex)
+            {
+                err = ex.Message.Split('\n')[0];
+            }
+
+            if (ok)
+            {
+                lblDbEstado.Text      = $"✅  Conexión exitosa — {cfg.Servidor}/{cfg.BaseDatos}";
+                lblDbEstado.ForeColor = ColorVerdeEsm;
+                AgregarAuditoria("Prueba BD Exitosa",
+                    $"Conectado a {cfg.Servidor}:{cfg.Puerto}/{cfg.BaseDatos}");
+            }
+            else
+            {
+                lblDbEstado.Text      = $"❌  Error: {err}";
+                lblDbEstado.ForeColor = ColorRojoSuave;
             }
         }
 
@@ -957,7 +1974,7 @@ namespace InterfazParqueadero
         }
 
         // ---------------------------------------------------------------
-        // CONTROL MANUAL — SIN VENTANA MODAL (registro pendiente)
+        // CONTROL MANUAL — Con popup de confirmación y ajuste de disponibilidad
         // ---------------------------------------------------------------
         private void BtnLevantar_Click(object? sender, EventArgs e)
         {
@@ -967,20 +1984,56 @@ namespace InterfazParqueadero
                     "No Conectado", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
-            if (zkManager.LevantarBrazo())
+
+            using var popup = new AperturaManualForm();
+            if (popup.ShowDialog(this) != DialogResult.OK)
+                return;
+
+            int  espacios  = popup.EspaciosAfectados;
+            bool esEntrada = popup.EsEntrada;
+            bool esMoto    = popup.EsMoto;
+
+            // ── Ajustar aforo global (CapacidadService) ───────────────────────
+            if (espacios > 0)
             {
-                MostrarBarreraArriba();
-                AgregarAuditoria("Subida Manual", $"Operador: {NombreOperador}");
-                
-                var manualInfo = new VehicleInfo {
-                    Nombres = "Sistema",
-                    Apellidos = "Manual",
-                    Placa = "—",
-                    TipoUsuario = "Operador",
-                    ColorTipo = Color.FromArgb(18, 60, 120) 
-                };
-                ActualizarAccesoVisual(manualInfo, "SUBIDA");
+                for (int i = 0; i < espacios; i++)
+                {
+                    if (esMoto)
+                    {
+                        if (esEntrada) CapacidadService.RegistrarEntradaMoto();
+                        else           CapacidadService.RegistrarSalidaMoto();
+                    }
+                    else
+                    {
+                        if (esEntrada) CapacidadService.RegistrarEntradaTag();
+                        else           CapacidadService.RegistrarSalidaTag();
+                    }
+                }
+                ActualizarTarjetasCapacidad();
             }
+
+            // ── Registro de auditoría visual en el Dashboard ───────────────────
+            string dirLabel  = esEntrada ? "Entrada" : "Salida";
+            string auditDesc = espacios == 0
+                ? $"Proveedor/Paso rápido — sin cambio de disponibilidad. Op.: {NombreOperador}"
+                : $"Apertura Manual: {dirLabel} de {espacios} vehículo(s). Op.: {NombreOperador}";
+            AgregarAuditoria($"Apertura Manual ({dirLabel})", auditDesc);
+            AuditoriaService.Registrar("BARRERA SUBIÓ", "SISTEMA", "", $"Apertura Manual — {NombreOperador}", "");
+
+            // ── Panel "Último Acceso" ──────────────────────────────────────────
+            var manualInfo = new VehicleInfo
+            {
+                Nombres    = espacios == 0 ? "Proveedor" : "Apertura",
+                Apellidos  = espacios == 0 ? "/ Paso Rápido" : $"Manual ({dirLabel})",
+                Placa      = espacios == 0 ? "PROVEEDOR" : $"{espacios} esp.",
+                TipoUsuario = "Operador",
+                ColorTipo  = esEntrada ? ColorVerdeEsm : ColorAzulInst
+            };
+            ActualizarAccesoVisual(manualInfo, esEntrada ? "ENTRADA" : "SALIDA");
+
+            // ── Abrir barrera física en ZKTeco ─────────────────────────────────
+            if (zkManager.LevantarBrazo())
+                MostrarBarreraArriba();
         }
 
         private void BtnBajar_Click(object? sender, EventArgs e)
@@ -995,6 +2048,7 @@ namespace InterfazParqueadero
             {
                 MostrarBarreraAbajo();
                 AgregarAuditoria("Bajada Manual", $"Operador: {NombreOperador}");
+                AuditoriaService.Registrar("BARRERA BAJÓ", "SISTEMA", "", $"Bajada Manual — {NombreOperador}", "");
 
                 var manualInfo = new VehicleInfo {
                     Nombres = "Sistema",
@@ -1042,6 +2096,205 @@ namespace InterfazParqueadero
         private void BtnSalir_Click(object? sender, EventArgs e) => Close();
 
         // ---------------------------------------------------------------
+        // PAINT EVENTS
+        // ---------------------------------------------------------------
+        private void PanelSuperior_Paint(object? sender, PaintEventArgs e)
+        {
+            if (sender is not Panel panel) return;
+
+            // Validar que el panel tenga dimensiones válidas
+            if (panel.Width <= 0 || panel.Height <= 0) return;
+
+            // Línea decorativa inferior con gradiente
+            int lineY = panel.Height - 3;
+            if (lineY > 0 && panel.Width > 1)
+            {
+                using var brush = new LinearGradientBrush(
+                    new Point(0, lineY),
+                    new Point(panel.Width, lineY),
+                    Color.FromArgb(115, 191, 213), // azulAccent
+                    Color.FromArgb(0, 150, 200));
+                e.Graphics.FillRectangle(brush, 0, lineY, panel.Width, 3);
+            }
+        }
+
+        private void PanelEstado_Paint(object? sender, PaintEventArgs e)
+        {
+            if (sender is not Panel panel) return;
+            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            using SolidBrush b = new SolidBrush(panel.BackColor);
+            e.Graphics.Clear(panelSuperior.BackColor);
+            e.Graphics.FillEllipse(b, 0, 0, 13, 13);
+        }
+
+        private void PanelSidebar_Paint(object? sender, PaintEventArgs e)
+        {
+            if (sender is not Panel panel) return;
+            var g = e.Graphics;
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+            int w = panel.Width;
+            int h = panel.Height;
+
+            // Gradiente vertical premium
+            if (h > 0 && w > 0)
+            {
+                using var gradBrush = new LinearGradientBrush(
+                    new Point(0, 0), new Point(0, h),
+                    Color.FromArgb(8, 28, 60), Color.FromArgb(12, 42, 85));
+                g.FillRectangle(gradBrush, panel.ClientRectangle);
+            }
+
+            // Línea derecha acento
+            using var accentPen = new Pen(Color.FromArgb(30, 100, 180, 255), 1);
+            g.DrawLine(accentPen, w - 1, 0, w - 1, h);
+
+            // Separador debajo del título
+            if (w > 30)
+            {
+                using var sepGrad = new LinearGradientBrush(
+                    new Point(15, 0), new Point(235, 0),
+                    Color.FromArgb(70, 100, 180, 255), Color.FromArgb(0, 100, 180, 255));
+                g.FillRectangle(sepGrad, 15, 44, 220, 1);
+            }
+
+            // Separador debajo de info usuario
+            if (w > 30)
+            {
+                using var sepUser = new LinearGradientBrush(
+                    new Point(15, 0), new Point(235, 0),
+                    Color.FromArgb(50, 100, 180, 255), Color.FromArgb(0, 100, 180, 255));
+                g.FillRectangle(sepUser, 15, 98, 220, 1);
+            }
+
+            // Separador antes de Cerrar Sesión
+            if (h > 60 && w > 30)
+            {
+                int sepY = h - 56;
+                using var bottomSep = new LinearGradientBrush(
+                    new Point(15, 0), new Point(235, 0),
+                    Color.FromArgb(50, 200, 80, 80), Color.FromArgb(0, 200, 80, 80));
+                g.FillRectangle(bottomSep, 15, sepY, 220, 1);
+            }
+        }
+
+        private void PanelLedArriba_Paint(object? sender, PaintEventArgs e)
+        {
+            if (sender is not Panel panel) return;
+            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            using SolidBrush b = new SolidBrush(panel.BackColor);
+            e.Graphics.Clear(Color.White);
+            e.Graphics.FillEllipse(b, 1, 1, 17, 17);
+        }
+
+        private void PanelLedAbajo_Paint(object? sender, PaintEventArgs e)
+        {
+            if (sender is not Panel panel) return;
+            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            using SolidBrush b = new SolidBrush(panel.BackColor);
+            e.Graphics.Clear(Color.White);
+            e.Graphics.FillEllipse(b, 1, 1, 17, 17);
+        }
+
+        private void PanelSnapshot_Paint(object? sender, PaintEventArgs e)
+        {
+            if (sender is not Panel panel) return;
+            using Pen pen = new Pen(Color.FromArgb(222, 226, 230), 1);
+            e.Graphics.DrawRectangle(pen, 0, 0, panel.Width - 1, panel.Height - 1);
+        }
+
+        private void PanelUltimoAcceso_Paint(object? sender, PaintEventArgs e)
+        {
+            if (sender is not Panel panel) return;
+            using Pen pen = new Pen(Color.FromArgb(200, 220, 240), 1);
+            e.Graphics.DrawRectangle(pen, 0, 0, panel.Width - 1, panel.Height - 1);
+        }
+
+        private void PanelHistorialAccesos_Paint(object? sender, PaintEventArgs e)
+        {
+            if (sender is not Panel panel) return;
+            using Pen pen = new Pen(Color.FromArgb(222, 226, 230), 1);
+            e.Graphics.DrawRectangle(pen, 0, 0, panel.Width - 1, panel.Height - 1);
+            using Font f = new Font("Segoe UI", 9f, FontStyle.Bold);
+            using SolidBrush b = new SolidBrush(Color.FromArgb(149, 165, 166));
+            e.Graphics.DrawString("HISTORIAL DE ACCESOS RECIENTES", f, b, 8, 4);
+        }
+
+        // ---------------------------------------------------------------
+        // RESIZE EVENTS
+        // ---------------------------------------------------------------
+        private void PanelSuperior_Resize(object? sender, EventArgs e)
+        {
+            int margenDerecho = 20;
+            lblEstado.Location = new Point(panelSuperior.Width - lblEstado.Width - margenDerecho, 25);
+            panelEstado.Location = new Point(lblEstado.Left - 22, 26);
+        }
+
+        private void PanelSidebar_Resize(object? sender, EventArgs e)
+        {
+            btnCerrarSesion.Location = new Point(0, panelSidebar.Height - 50);
+            panelSidebar.Invalidate();
+        }
+
+        // ---------------------------------------------------------------
+        // SIDEBAR BUTTON CONFIGURATION (called from Designer)
+        // ---------------------------------------------------------------
+        private void ConfigSidebarBtnSimple(Button btn, string text, int yPos, 
+            Color hoverColor, Color pressColor, Color normalColor)
+        {
+            btn.FlatStyle = FlatStyle.Flat;
+            btn.FlatAppearance.BorderSize = 0;
+            btn.FlatAppearance.MouseOverBackColor = hoverColor;
+            btn.FlatAppearance.MouseDownBackColor = pressColor;
+            btn.Font = new Font("Segoe UI", 10f);
+            btn.ForeColor = normalColor;
+            btn.BackColor = Color.Transparent;
+            btn.TextAlign = ContentAlignment.MiddleLeft;
+            btn.Padding = new Padding(22, 0, 0, 0);
+            btn.Location = new Point(0, yPos);
+            btn.Size = new Size(250, 42);
+            btn.Text = text;
+            btn.Cursor = Cursors.Hand;
+
+            // Event handlers for hover effects
+            btn.MouseEnter += SidebarBtn_MouseEnter;
+            btn.MouseLeave += SidebarBtn_MouseLeave;
+            btn.Paint += SidebarBtn_Paint;
+        }
+
+        private void SidebarBtn_MouseEnter(object? sender, EventArgs e)
+        {
+            if (sender is not Button btn) return;
+            if (btn.Tag?.ToString() != "active")
+            {
+                btn.ForeColor = Color.FromArgb(235, 245, 255);
+                btn.BackColor = Color.FromArgb(12, 48, 98);
+            }
+        }
+
+        private void SidebarBtn_MouseLeave(object? sender, EventArgs e)
+        {
+            if (sender is not Button btn) return;
+            if (btn.Tag?.ToString() != "active")
+            {
+                btn.ForeColor = Color.FromArgb(175, 200, 230);
+                btn.BackColor = Color.Transparent;
+            }
+        }
+
+        private void SidebarBtn_Paint(object? sender, PaintEventArgs e)
+        {
+            if (sender is not Button btn) return;
+            if (btn.Tag?.ToString() == "active")
+            {
+                using SolidBrush barBrush = new SolidBrush(Color.FromArgb(40, 167, 69));
+                e.Graphics.FillRectangle(barBrush, 0, 4, 4, btn.Height - 8);
+                using var glowBrush = new SolidBrush(Color.FromArgb(15, 40, 167, 69));
+                e.Graphics.FillRectangle(glowBrush, 4, 0, 10, btn.Height);
+            }
+        }
+
+        // ---------------------------------------------------------------
         // CERRAR SESIÓN
         // ---------------------------------------------------------------
         private void BtnCerrarSesion_Click(object? sender, EventArgs e)
@@ -1085,6 +2338,7 @@ namespace InterfazParqueadero
                     zkManager.LevantarBrazo();
                 MostrarBarreraArriba();
                 AgregarAuditoria("Apertura Manual (Ticket)", $"Operador: {NombreOperador}");
+                AuditoriaService.Registrar("BARRERA SUBIÓ", "MANUAL", "", $"Ticket visitante — {NombreOperador}", "");
             };
             ticketForm.OnBajarBarrera += () =>
             {
@@ -1092,35 +2346,249 @@ namespace InterfazParqueadero
                     zkManager.BajarBrazo();
                 MostrarBarreraAbajo();
                 AgregarAuditoria("Bajada Manual (Ticket)", $"Operador: {NombreOperador}");
+                AuditoriaService.Registrar("BARRERA BAJÓ", "MANUAL", "", $"Ticket visitante — {NombreOperador}", "");
             };
-            if (ticketForm.ShowDialog(this) == DialogResult.OK)
+
+            // Actualizar dashboard inmediatamente al generar ticket de entrada
+            ticketForm.OnVisitanteEntro += (placa, codigo) =>
             {
-                string direccion = ticketForm.UltimaAccion.ToUpper(); // "ENTRADA" o "SALIDA"
-                string etiqueta = direccion == "SALIDA" ? "Ticket Visitante (Salida)" : "Ticket Visitante (Entrada)";
-
-                AgregarAuditoria(etiqueta, $"Ticket {ticketForm.CodigoTicket} — Placa: {ticketForm.PlacaIngresada}");
-                AgregarAuditoria(etiqueta, $"Ticket {ticketForm.CodigoTicket}");
-
-                var visitanteInfo = new VehicleInfo
+                var info = new VehicleInfo
                 {
-                    TagID = ticketForm.CodigoTicket ?? "V000",
-                    Cedula = "VISITANTE",
-                    Nombres = "Visitante",
-                    Apellidos = ticketForm.PlacaIngresada ?? "",
-                    Placa = ticketForm.PlacaIngresada ?? "SIN PLACA",
-                    TipoUsuario = "Visitante",
-                    Facultad = "Externo",
-                    LugarAsignado = 0,
+                    TagID = codigo, Cedula = "VISITANTE",
+                    Nombres = "Visitante", Apellidos = placa,
+                    Placa = placa, TipoUsuario = "Visitante",
+                    Facultad = "Externo", LugarAsignado = 0,
                     ColorTipo = Color.FromArgb(155, 89, 182)
                 };
-                ActualizarAccesoVisual(visitanteInfo, direccion);
-                AgregarIngresoSalida(direccion, visitanteInfo);
-                MostrarBarreraArriba();
-                }
+                ActualizarTarjetasCapacidad();
+                AgregarAuditoria("Ticket Visitante (Entrada)", $"Ticket {codigo} — Placa: {placa}");
+                AuditoriaService.Registrar("ENTRÓ", "VISITANTE", "", $"Visitante ({codigo})", placa);
+                ActualizarAccesoVisual(info, "ENTRADA");
+                AgregarIngresoSalida("ENTRADA", info);
+            };
+
+            // Actualizar dashboard inmediatamente al cobrar en la salida
+            ticketForm.OnVisitanteSalio += (placa, codigo, total) =>
+            {
+                var info = new VehicleInfo
+                {
+                    TagID = codigo, Cedula = "VISITANTE",
+                    Nombres = "Visitante", Apellidos = placa,
+                    Placa = placa, TipoUsuario = "Visitante",
+                    Facultad = "Externo", LugarAsignado = 0,
+                    ColorTipo = Color.FromArgb(155, 89, 182)
+                };
+                ActualizarTarjetasCapacidad();
+                AgregarAuditoria("Ticket Visitante (Salida)", $"Ticket {codigo} — Placa: {placa} — Total: ${total:F2}");
+                AuditoriaService.Registrar("SALIÓ", "VISITANTE", "", $"Visitante ({codigo})", placa);
+                ActualizarAccesoVisual(info, "SALIDA");
+                AgregarIngresoSalida("SALIDA", info);
+            };
+            // Los eventos OnVisitanteEntro / OnVisitanteSalio ya actualizan el dashboard.
+            // El formulario se auto-cierra tras generar el ticket de entrada.
+            ticketForm.ShowDialog(this);
+            ActualizarResumenCajaDiaria();
             NavegarA("Dashboard", btnNavDashboard);
         }
 
 
+
+        // ---------------------------------------------------------------
+        // ESCÁNER USB — SALIDA DE VISITANTES DESDE DASHBOARD
+        // ---------------------------------------------------------------
+        private static Control? GetDeepFocused_Form1(ContainerControl root)
+        {
+            Control? active = root.ActiveControl;
+            if (active is ContainerControl cc && cc.ActiveControl != null)
+                return GetDeepFocused_Form1(cc);
+            return active;
+        }
+
+        // Devuelve true si hay un diálogo modal abierto encima de Form1.
+        private bool EsDialogoAbierto() =>
+            Form.ActiveForm != null && Form.ActiveForm != this;
+
+        // Devuelve true si el foco está en un campo de texto (el operador está escribiendo).
+        private bool OperadorEscribiendo() =>
+            GetDeepFocused_Form1(this) is TextBox or ComboBox or NumericUpDown;
+
+        // Suprime la tecla Enter ANTES de que active cualquier botón del sidebar.
+        // Con KeyPreview=true, OnKeyDown se dispara antes que el control enfocado.
+        protected override void OnKeyDown(KeyEventArgs e)
+        {
+            base.OnKeyDown(e);
+            if (EsDialogoAbierto() || OperadorEscribiendo()) return;
+
+            // Enter con buffer no vacío = terminador del escáner → suprimir click en botón
+            if (e.KeyCode == Keys.Return && _visitorScanBuffer.Length >= 4)
+            {
+                e.SuppressKeyPress = true; // Suprime KeyPress y el WM_CHAR que activaría el botón
+                _visitorScanTimer.Stop();
+                ProcesarBufferEscaner();
+            }
+        }
+
+        protected override void OnKeyPress(KeyPressEventArgs e)
+        {
+            base.OnKeyPress(e);
+            if (EsDialogoAbierto() || OperadorEscribiendo()) return;
+
+            if (e.KeyChar >= 32) // Carácter imprimible
+            {
+                var now = DateTime.Now;
+                var elapsed = (now - _visitorLastKeyTime).TotalMilliseconds;
+                _visitorLastKeyTime = now;
+
+                // Pausa larga antes de este carácter → el buffer anterior era de un humano; descartarlo
+                if (_visitorScanBuffer.Length > 0 && elapsed > 150.0)
+                {
+                    _visitorScanBuffer.Clear();
+                    _visitorScanTimer.Stop();
+                }
+
+                _visitorScanBuffer.Append(e.KeyChar);
+
+                // Reiniciar temporizador: 150 ms sin nuevos chars → procesar como escaneo completo
+                _visitorScanTimer.Stop();
+                _visitorScanTimer.Start();
+
+                e.Handled = true; // Evitar que el carácter llegue a controles de fondo
+            }
+        }
+
+        private void ProcesarBufferEscaner()
+        {
+            string codigo = _visitorScanBuffer.ToString().Trim();
+            _visitorScanBuffer.Clear();
+            _visitorLastKeyTime = DateTime.MinValue;
+            // Mínimo 4 chars para ser un código de ticket válido (ej. "V001001" = 7 chars)
+            if (codigo.Length >= 4)
+                ProcesarSalidaEscanerDashboard(codigo);
+        }
+
+        private void ProcesarSalidaEscanerDashboard(string codigo)
+        {
+            var ticket = TicketVisitanteForm.TicketsActivos
+                .FirstOrDefault(t => t.Activo && t.Codigo.Equals(codigo, StringComparison.OrdinalIgnoreCase));
+
+            if (ticket == null)
+            {
+                MessageBox.Show(
+                    $"Ticket \"{codigo}\" no encontrado o ya fue procesado.",
+                    "Escáner — Salida Visitante",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // Pre-calcular permanencia y tarifa SIN modificar el ticket todavía
+            var fechaSalida = DateTime.Now;
+            var perm = fechaSalida - ticket.FechaEntrada;
+            decimal horas = (decimal)Math.Ceiling(perm.TotalHours);
+            if (horas < 1m) horas = 1m;
+            decimal total = horas * TicketVisitanteForm.TARIFA_HORA;
+
+            // Mostrar factura y esperar confirmación del operador
+            bool confirmado = TicketVisitanteForm.MostrarConfirmarPago(this, ticket, perm, horas, total);
+
+            // Siempre devolver el foco a Form1 para que el escáner funcione de nuevo.
+            // El diálogo TopMost no restaura el foco automáticamente al cerrarse.
+            _visitorScanBuffer.Clear();
+            _visitorScanTimer.Stop();
+            _visitorLastKeyTime = DateTime.MinValue;
+            this.Activate();
+
+            if (!confirmado)
+                return; // Cancelado — ticket permanece activo
+
+            // Confirmar pago: actualizar modelo
+            ticket.FechaSalida = fechaSalida;
+            ticket.TotalPagar = total;
+            ticket.Activo = false;
+            TicketVisitanteForm.GuardarTicketsEnArchivo();
+
+            // Decrementar aforo (el visitante escaneado desde el dashboard paga y sale)
+            CapacidadService.RegistrarSalidaVisitante(ticket.EsMoto);
+            ActualizarTarjetasCapacidad();
+
+            // Actualizar dashboard con info de salida
+            var info = new VehicleInfo
+            {
+                TagID = ticket.Codigo, Cedula = "VISITANTE",
+                Nombres = "Visitante", Apellidos = ticket.Placa,
+                Placa = ticket.Placa, TipoUsuario = "Visitante",
+                Facultad = $"Permanencia: {(int)perm.TotalHours}h {perm.Minutes}m  |  Total: ${ticket.TotalPagar:F2}",
+                LugarAsignado = 0, ColorTipo = Color.FromArgb(155, 89, 182)
+            };
+            AgregarAuditoria(
+                "Ticket Visitante (Salida)",
+                $"Ticket {ticket.Codigo} — Placa: {ticket.Placa} — " +
+                $"{(int)perm.TotalHours}h {perm.Minutes}m — Total: ${ticket.TotalPagar:F2}");
+            AuditoriaService.Registrar("SALIÓ", "VISITANTE", "", $"Visitante ({ticket.Codigo})", ticket.Placa);
+            ActualizarAccesoVisual(info, "SALIDA");
+            AgregarIngresoSalida("SALIDA", info);
+
+            // Imprimir factura de salida
+            ImprimirFacturaSalidaVisitante(ticket);
+
+            // Popup cobro exitoso, luego abrir barrera
+            TicketVisitanteForm.MostrarPopupCobroExitoso(this, ticket);
+            if (zkManager.EstaConectado) zkManager.LevantarBrazo();
+            MostrarBarreraArriba();
+        }
+
+        private void ImprimirFacturaSalidaVisitante(TicketVisitante ticket)
+        {
+            try
+            {
+                var perm = ticket.FechaSalida!.Value - ticket.FechaEntrada;
+                decimal horasCobradas = (decimal)Math.Ceiling(perm.TotalHours);
+                if (horasCobradas < 1m) horasCobradas = 1m;
+
+                byte[] data = new EscPosBuilder()
+                    .Init()
+                    .Left()
+                    .TextLine("- Ticket perdido: $10.00")
+                    .TextLine("- Cancelar antes de salir")
+                    .Separator(42, '-')
+                    .Center()
+                    .Bold(true).DoubleHeight(true).TextLine("Parqueadero").TextLine("PUCESA").DoubleHeight(false).Bold(false)
+                    .TextLine("Av. Los Chasquis s/n, Ambato")
+                    .Separator(42, '-')
+                    .Left()
+                    .TextLine($"Comprobante: {ticket.Codigo}")
+                    .TextLine("Cliente    : Visitante")
+                    .Separator(42, '-')
+                    .TextLine($"Hora de llegada:")
+                    .TextLine($"  {ticket.FechaEntrada:dd/MM/yyyy  HH:mm:ss}")
+                    .TextLine($"Hora de salida:")
+                    .TextLine($"  {ticket.FechaSalida:dd/MM/yyyy  HH:mm:ss}")
+                    .TextLine($"Placa      : {ticket.Placa}")
+                    .TextLine($"Permanencia: {(int)perm.TotalHours}h {perm.Minutes}m {perm.Seconds}s")
+                    .TextLine($"Horas cobradas: {horasCobradas}")
+                    .TextLine($"Tarifa     : ${TicketVisitanteForm.TARIFA_HORA} / hora")
+                    .Separator(42, '=')
+                    .Center()
+                    .Bold(true)
+                    .TextLine("Total a pagar:")
+                    .DoubleHeight(true)
+                    .TextLine($"  ${ticket.TotalPagar:F2}")
+                    .DoubleHeight(false).Bold(false)
+                    .Separator(42)
+                    .Barcode128(ticket.Codigo)
+                    .Feed(4)
+                    .FullCut()
+                    .Build();
+
+                RawPrinterHelper.SendBytesToPrinter(nombreImpresora, data);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"No se pudo imprimir la factura de salida.\n\n{ex.Message}",
+                    "Error de Impresión",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
 
         // ---------------------------------------------------------------
         // INGRESOS / SALIDAS (antes "Auditoría")

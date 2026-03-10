@@ -1,0 +1,69 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\Usuario\\Downloads\\Parqueadero_final_V5.0\\InterfazParqueadero_2\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{E18E33D7-35C8-907F-FA3F-6513572435AA}|InterfazParqueadero.csproj|c:\\users\\usuario\\downloads\\parqueadero_final_v5.0\\interfazparqueadero_2\\tagregistroform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "RelativeMoniker": "D:0:0:{E18E33D7-35C8-907F-FA3F-6513572435AA}|InterfazParqueadero.csproj|solutionrelative:tagregistroform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{E18E33D7-35C8-907F-FA3F-6513572435AA}|InterfazParqueadero.csproj|c:\\users\\usuario\\downloads\\parqueadero_final_v5.0\\interfazparqueadero_2\\motiveform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "RelativeMoniker": "D:0:0:{E18E33D7-35C8-907F-FA3F-6513572435AA}|InterfazParqueadero.csproj|solutionrelative:motiveform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{E18E33D7-35C8-907F-FA3F-6513572435AA}|InterfazParqueadero.csproj|c:\\users\\usuario\\downloads\\parqueadero_final_v5.0\\interfazparqueadero_2\\loginform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{E18E33D7-35C8-907F-FA3F-6513572435AA}|InterfazParqueadero.csproj|solutionrelative:loginform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 0,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "TagRegistroForm.cs [Dise\u00F1o]",
+              "DocumentMoniker": "C:\\Users\\Usuario\\Downloads\\Parqueadero_final_V5.0\\InterfazParqueadero_2\\TagRegistroForm.cs",
+              "RelativeDocumentMoniker": "TagRegistroForm.cs",
+              "ToolTip": "C:\\Users\\Usuario\\Downloads\\Parqueadero_final_V5.0\\InterfazParqueadero_2\\TagRegistroForm.cs [Dise\u00F1o]",
+              "RelativeToolTip": "TagRegistroForm.cs [Dise\u00F1o]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-09T16:22:20.954Z",
+              "EditorCaption": " [Dise\u00F1o]"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "MotiveForm.cs [Dise\u00F1o]",
+              "DocumentMoniker": "C:\\Users\\Usuario\\Downloads\\Parqueadero_final_V5.0\\InterfazParqueadero_2\\MotiveForm.cs",
+              "RelativeDocumentMoniker": "MotiveForm.cs",
+              "ToolTip": "C:\\Users\\Usuario\\Downloads\\Parqueadero_final_V5.0\\InterfazParqueadero_2\\MotiveForm.cs [Dise\u00F1o]",
+              "RelativeToolTip": "MotiveForm.cs [Dise\u00F1o]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-09T16:22:09.459Z",
+              "EditorCaption": " [Dise\u00F1o]"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "LoginForm.cs",
+              "DocumentMoniker": "C:\\Users\\Usuario\\Downloads\\Parqueadero_final_V5.0\\InterfazParqueadero_2\\LoginForm.cs",
+              "RelativeDocumentMoniker": "LoginForm.cs",
+              "ToolTip": "C:\\Users\\Usuario\\Downloads\\Parqueadero_final_V5.0\\InterfazParqueadero_2\\LoginForm.cs",
+              "RelativeToolTip": "LoginForm.cs",
+              "ViewState": "AgIAADIAAAAAAAAAAAAewDgAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-09T16:21:54.795Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

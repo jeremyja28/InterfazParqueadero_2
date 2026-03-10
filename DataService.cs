@@ -369,5 +369,23 @@ namespace InterfazParqueadero
             }
             return p[0][0].ToString().ToUpper();
         }
+
+        // ═══════════════════════════════════════════════════════════════
+        // RESET DE TURNO
+        // ═══════════════════════════════════════════════════════════════
+
+        /// <summary>Reinicia el estado de todos los TAGs a "afuera" (útil para reset de turno).</summary>
+        public static void ResetearEstadoTodos()
+        {
+            _estadoAcceso.Clear();
+        }
+
+        /// <summary>Igual que BuscarPorTag pero devuelve el registro aunque esté inactivo (Activo=false).</summary>
+        public static VehicleInfo? BuscarPorTagTodos(string tagId)
+        {
+            Inicializar();
+            if (string.IsNullOrWhiteSpace(tagId)) return null;
+            return _vehiculos.TryGetValue(tagId.Trim(), out var info) ? info : null;
+        }
     }
 }

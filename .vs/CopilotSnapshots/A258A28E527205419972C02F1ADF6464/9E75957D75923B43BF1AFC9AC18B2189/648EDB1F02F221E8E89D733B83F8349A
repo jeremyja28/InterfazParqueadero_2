@@ -1,0 +1,1867 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.IO;
+using System.Linq;
+using System.Text.Json;
+using System.Windows.Forms;
+
+namespace InterfazParqueadero
+{
+    // ═══════════════════════════════════════════════════════════════
+    // Modelo de ticket para visitantes
+    // ═══════════════════════════════════════════════════════════════
+    public class TicketVisitante
+    {
+        public string Codigo { get; set; } = "";
+        public string Placa { get; set; } = "";
+        public DateTime FechaEntrada { get; set; }
+        public DateTime? FechaSalida { get; set; }
+        public decimal TotalPagar { get; set; }
+        public bool Activo { get; set; } = true;
+        public string Observacion { get; set; } = "";
+        public bool EsMoto { get; set; } = false;
+    }
+
+    /// <summary>
+    /// Formulario para gestión de tickets de visitantes.
+    /// Dos modos: Entrada (generar ticket) y Salida (cobro con popup personalizado).
+    /// </summary>
+    public partial class TicketVisitanteForm : Form
+    {
+        // ═══════════════════════════════════════════════════════════
+        // PALETA PUCESA
+        // ═══════════════════════════════════════════════════════════
+        private static readonly Color AzulOscuro  = Color.FromArgb(0, 51, 102);
+        private static readonly Color AzulInst    = Color.FromArgb(0, 82, 165);
+        private static readonly Color AzulAccent  = Color.FromArgb(74, 144, 217);
+        private static readonly Color FondoClaro  = Color.FromArgb(245, 247, 250);
+        private static readonly Color BlancoCard  = Color.White;
+        private static readonly Color TextoOscuro = Color.FromArgb(26, 35, 50);
+        private static readonly Color VerdeEsm    = Color.FromArgb(40, 167, 69);
+        private static readonly Color RojoSuave   = Color.FromArgb(220, 53, 69);
+        private static readonly Color Dorado      = Color.FromArgb(255, 193, 7);
+
+        // ═══════════════════════════════════════════════════════════
+        // DATOS ESTÁTICOS (persisten entre aperturas)
+        // ═══════════════════════════════════════════════════════════
+        internal static readonly List<TicketVisitante> TicketsActivos = new();
+        internal static int _contadorTickets = 1000;
+        internal const decimal TARIFA_HORA = 0.50m;
+
+        // ─── Persistencia JSON — delegada a TicketStorageService ──────────────
+        // Carga automática al arrancar la aplicación
+        static TicketVisitanteForm() { CargarTicketsDeArchivo(); }
+
+        internal static void GuardarTicketsEnArchivo()
+            => TicketStorageService.Guardar(TicketsActivos, _contadorTickets);
+
+        /// <summary>Recarga la lista desde el JSON en disco (para el botón Actualizar de Reportes).</summary>
+        internal static void RecargarDesdeJSON() => CargarTicketsDeArchivo();
+
+        private static void CargarTicketsDeArchivo()
+        {
+            var (tickets, contador) = TicketStorageService.Cargar();
+            _contadorTickets = contador;
+            TicketsActivos.Clear();
+            TicketsActivos.AddRange(tickets);
+        }
+
+        // ── Controles Entrada ──
+        private TextBox txtPlacaEntrada = null!;
+        private Panel panelTicketPreview = null!;
+        private TicketVisitante? _ticketGenerado;
+        private TimeSpan? _horaManual;
+        private Label lblHoraIndicador = null!;
+        private Button btnLimpiarHora = null!;
+        private RadioButton rdCarroTicket = null!;
+        private RadioButton rdMotoTicket  = null!;
+
+        // ── Controles Salida ──
+        private ComboBox cmbTicketsActivos = null!;
+        private TextBox txtBuscarPlaca = null!;
+        private Label lblResumenCobro = null!;
+        private Button btnCobrarAbrir = null!;
+        private Button btnExonerar = null!;
+        private TicketVisitante? _ticketSalida;
+
+        private string _modo = "entrada";
+
+        // ── Impresora térmica ─────────────────────────────────────────────────
+        // Cambiar al nombre exacto de la impresora instalada en Windows (Panel de control → Dispositivos).
+        private string nombreImpresora = "EPSON TM-T20III Receipt";
+
+        // ── Captura del escáner USB (emulador de teclado) ────────────────────
+        private readonly System.Text.StringBuilder _scanBuffer = new();
+        private DateTime _lastKeyTime = DateTime.MinValue;
+        /// <summary>Umbral máximo (ms) entre pulsaciones para distinguir el escáner del teclado.</summary>
+        private const double SCANNER_INTER_KEY_MS = 50.0;
+        /// <summary>Verdadero cuando el buffer fue llenado con una ráfaga del escáner (chars rápidos consecutivos).</summary>
+        private bool _bufferBuiltByScanner = false;
+
+        /// <summary>Código del ticket generado o cobrado.</summary>
+        public string CodigoTicket { get; private set; } = "";
+        /// <summary>Placa ingresada por el usuario.</summary>
+        public string PlacaIngresada { get; private set; } = "";
+        /// <summary>Indica si la última acción fue entrada o salida.</summary>
+        public string UltimaAccion { get; private set; } = "entrada";
+
+        /// <summary>Evento para solicitar apertura de barrera tras cobro exitoso.</summary>
+        public event Action? OnAbrirBarrera;
+        /// <summary>Evento para solicitar cierre/bajada de barrera.</summary>
+        public event Action? OnBajarBarrera;
+        /// <summary>Evento que se dispara inmediatamente al generar un ticket de entrada (placa, codigo).</summary>
+        public event Action<string, string>? OnVisitanteEntro;
+        /// <summary>Evento que se dispara al cobrar y abrir barrera en la salida (placa, codigo, total).</summary>
+        public event Action<string, string, decimal>? OnVisitanteSalio;
+
+        public TicketVisitanteForm() : this("entrada") { }
+
+        public TicketVisitanteForm(string modo)
+        {
+            _modo = modo.ToLower();
+            ConfigurarFormulario();
+            CrearContenido();
+        }
+
+        private void ConfigurarFormulario()
+        {
+            Text = "Tickets de Visitantes — PUCESA";
+            AutoScaleMode = AutoScaleMode.None;
+            ClientSize = new Size(900, 620);
+            StartPosition = FormStartPosition.CenterParent;
+            WindowState = FormWindowState.Maximized;
+            FormBorderStyle = FormBorderStyle.Sizable;
+            MinimumSize = new Size(800, 550);
+            BackColor = FondoClaro;
+            Font = new Font("Segoe UI", 12f);
+            ShowInTaskbar = false;
+            KeyPreview = true;   // Activa captura global del teclado para el escáner USB
+        }
+
+        private void CrearContenido()
+        {
+            SuspendLayout();
+
+            // ── HEADER Dock=Top ──────────────────────────────────
+            Panel header = new Panel { Dock = DockStyle.Top, Height = 58, BackColor = AzulOscuro };
+            header.Paint += (s, e) =>
+            {
+                using var br = new LinearGradientBrush(new Point(0, 55), new Point(header.Width, 55), AzulAccent, Color.FromArgb(0, 150, 200));
+                e.Graphics.FillRectangle(br, 0, 55, header.Width, 3);
+            };
+            header.Controls.Add(new Label
+            {
+                Text = "🎫  Sistema de Tickets — Visitantes",
+                Font = new Font("Segoe UI", 15f, FontStyle.Bold),
+                ForeColor = Color.White,
+                Location = new Point(18, 13), AutoSize = true
+            });
+            Button btnCerrar = new Button
+            {
+                Text = "✕  Cerrar",
+                Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+                ForeColor = Color.White, BackColor = Color.FromArgb(192, 57, 43),
+                FlatStyle = FlatStyle.Flat, Size = new Size(120, 36),
+                Cursor = Cursors.Hand, Anchor = AnchorStyles.Top | AnchorStyles.Right
+            };
+            btnCerrar.Location = new Point(header.Width - 132, 11);
+            btnCerrar.FlatAppearance.BorderSize = 0;
+            btnCerrar.Click += (s, e) => Close();
+            header.Controls.Add(btnCerrar);
+
+            // Botón Reportes — colocado a la izquierda del botón Cerrar
+            Button btnReportes = new Button
+            {
+                Text = "📊 Reportes",
+                Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+                ForeColor = Color.White, BackColor = Color.FromArgb(52, 73, 110),
+                FlatStyle = FlatStyle.Flat, Size = new Size(150, 36),
+                Cursor = Cursors.Hand, Anchor = AnchorStyles.Top | AnchorStyles.Right
+            };
+            btnReportes.Location = new Point(header.Width - 290, 11);
+            btnReportes.FlatAppearance.BorderSize = 0;
+            btnReportes.Click += (s, e) => new ReportesVisitantesForm().ShowDialog(this);
+            header.Controls.Add(btnReportes);
+            // Mantener ambos botones pegados al borde derecho al redimensionar
+            header.Resize += (s, e) =>
+            {
+                btnCerrar.Location   = new Point(header.Width - 132, 11);
+                btnReportes.Location = new Point(header.Width - 290, 11);
+            };
+
+            // ── BARRIER STRIP Dock=Bottom — added BEFORE Fill ────
+            Panel panelBarrera = new Panel { Dock = DockStyle.Bottom, Height = 76, BackColor = Color.FromArgb(18, 32, 65) };
+            panelBarrera.Controls.Add(new Label
+            {
+                Text = "CONTROL MANUAL DE BARRERA",
+                Font = new Font("Segoe UI", 9f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(149, 175, 210),
+                Location = new Point(14, 5), AutoSize = true
+            });
+            Button btnAbrirBarrera = new Button
+            {
+                Text = "🔼  ABRIR BARRERA",
+                Font = new Font("Segoe UI", 12f, FontStyle.Bold),
+                ForeColor = Color.White, BackColor = Color.FromArgb(39, 174, 96),
+                FlatStyle = FlatStyle.Flat, Size = new Size(240, 46),
+                Location = new Point(14, 24), Cursor = Cursors.Hand
+            };
+            btnAbrirBarrera.FlatAppearance.BorderSize = 0;
+            btnAbrirBarrera.Click += (s, e) => OnAbrirBarrera?.Invoke();
+            panelBarrera.Controls.Add(btnAbrirBarrera);
+            Button btnBajarBarrera = new Button
+            {
+                Text = "🔽  BAJAR BARRERA",
+                Font = new Font("Segoe UI", 12f, FontStyle.Bold),
+                ForeColor = Color.White, BackColor = Color.FromArgb(192, 57, 43),
+                FlatStyle = FlatStyle.Flat, Size = new Size(240, 46),
+                Location = new Point(266, 24), Cursor = Cursors.Hand
+            };
+            btnBajarBarrera.FlatAppearance.BorderSize = 0;
+            btnBajarBarrera.Click += (s, e) => OnBajarBarrera?.Invoke();
+            panelBarrera.Controls.Add(btnBajarBarrera);
+
+            // ── SPLIT CONTAINER Dock=Fill ─────────────────────────
+            SplitContainer split = new SplitContainer
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.FromArgb(210, 218, 230),
+                BorderStyle = BorderStyle.None,
+                SplitterWidth = 6
+            };
+            this.Shown += (s, e) =>
+            {
+                if (split.Width > 60)
+                    split.SplitterDistance = split.Width / 2;
+            };
+
+            // Add controls: Fill first, then Bottom, then Top (last added docks first)
+            Controls.Add(split);
+            Controls.Add(panelBarrera);
+            Controls.Add(header);
+
+            // ════════════════════════════════════════════════════
+            // LEFT PANEL — ENTRADA
+            // Dock stacking order: Bottom first, then Top(s), then Fill
+            // ════════════════════════════════════════════════════
+
+            // [Bottom] Imprimir button
+            Panel pEntBot = new Panel { Dock = DockStyle.Bottom, Height = 52, BackColor = BlancoCard, Padding = new Padding(10, 7, 10, 7) };
+            Button btnImprimir = new Button
+            {
+                Text = "🖨  Imprimir Ticket",
+                Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+                ForeColor = Color.White, BackColor = Color.FromArgb(108, 117, 125),
+                FlatStyle = FlatStyle.Flat, Dock = DockStyle.Fill, Cursor = Cursors.Hand
+            };
+            btnImprimir.FlatAppearance.BorderSize = 0;
+            btnImprimir.Click += (s, e) =>
+            {
+                if (_ticketGenerado != null) ImprimirTicketReal(_ticketGenerado);
+                else MessageBox.Show("Primero genere un ticket.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            };
+            pEntBot.Controls.Add(btnImprimir);
+
+            // [Top] Title bar + input row container
+            Panel pEntTop = new Panel { Dock = DockStyle.Top, Height = 130, BackColor = BlancoCard };
+
+            // Title bar: Dock=Top, always at y=0 (only one Top control)
+            Panel pEntTitle = new Panel { Dock = DockStyle.Top, Height = 40, BackColor = AzulOscuro };
+            pEntTitle.Controls.Add(new Label
+            {
+                Text = "✏️  ENTRADA — Generar Ticket",
+                Font = new Font("Segoe UI", 11f, FontStyle.Bold),
+                ForeColor = Color.White, Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Padding = new Padding(12, 0, 0, 0)
+            });
+            pEntTop.Controls.Add(pEntTitle);
+
+            // Input row: Dock=Fill takes remaining 90px
+            Panel pEntInput = new Panel { Dock = DockStyle.Fill, BackColor = BlancoCard };
+            pEntInput.Controls.Add(new Label
+            {
+                Text = "Placa del vehículo:",
+                Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+                ForeColor = TextoOscuro, Location = new Point(12, 10), AutoSize = true
+            });
+            txtPlacaEntrada = new TextBox
+            {
+                Location = new Point(12, 36), Size = new Size(195, 34),
+                Font = new Font("Segoe UI", 12f),
+                CharacterCasing = CharacterCasing.Upper,
+                PlaceholderText = "Ej: ABC-1234",
+                BorderStyle = BorderStyle.FixedSingle,
+                MaxLength = 8
+            };
+            txtPlacaEntrada.KeyPress += (s, e) =>
+            {
+                // Siempre permitir teclas de control (Backspace, Delete, etc.)
+                if (char.IsControl(e.KeyChar)) return;
+
+                var tb = (TextBox)s!;
+                int len = tb.Text.Length;
+
+                if (len < 3)
+                {
+                    // Posiciones 0-2: solo letras (A-Z). Upper se aplica automáticamente.
+                    if (!char.IsLetter(e.KeyChar))
+                        e.Handled = true;
+                }
+                else if (len == 3)
+                {
+                    // Posición 3: se espera el guion separador.
+                    if (char.IsDigit(e.KeyChar))
+                    {
+                        // Si el usuario escribe directamente un número, insertar '-' automáticamente.
+                        tb.Text += "-";
+                        tb.SelectionStart = tb.Text.Length;
+                        // Dejar pasar el dígito (se añadirá como posición 4).
+                    }
+                    else if (e.KeyChar != '-')
+                    {
+                        // Ni guion ni dígito: bloquear.
+                        e.Handled = true;
+                    }
+                }
+                else
+                {
+                    // Posiciones 4 en adelante (después del guion): solo dígitos.
+                    if (!char.IsDigit(e.KeyChar))
+                        e.Handled = true;
+                }
+            };
+            pEntInput.Controls.Add(txtPlacaEntrada);
+            Button btnGenerar = new Button
+            {
+                Text = "🎫 GENERAR TICKET",
+                Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+                ForeColor = Color.White, BackColor = AzulInst,
+                FlatStyle = FlatStyle.Flat,
+                Location = new Point(215, 34), Size = new Size(185, 38),
+                Cursor = Cursors.Hand
+            };
+            btnGenerar.FlatAppearance.BorderSize = 0;
+            btnGenerar.Click += (s, e) => GenerarTicket();
+            pEntInput.Controls.Add(btnGenerar);
+
+            // Selector de tipo de vehículo
+            rdCarroTicket = new RadioButton
+            {
+                Text = "🚗 Carro",
+                Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+                ForeColor = TextoOscuro,
+                Location = new Point(215, 80), AutoSize = true,
+                Checked = true, Cursor = Cursors.Hand
+            };
+            rdMotoTicket = new RadioButton
+            {
+                Text = "🏍️ Moto",
+                Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+                ForeColor = TextoOscuro,
+                Location = new Point(315, 80), AutoSize = true,
+                Cursor = Cursors.Hand
+            };
+            pEntInput.Controls.Add(rdCarroTicket);
+            pEntInput.Controls.Add(rdMotoTicket);
+
+            // Botón selector de hora manual
+            Button btnManual = new Button
+            {
+                Text = "🕒 Hora manual",
+                Font = new Font("Segoe UI", 9f, FontStyle.Bold),
+                ForeColor = Color.White, BackColor = Color.FromArgb(52, 73, 110),
+                FlatStyle = FlatStyle.Flat,
+                Location = new Point(12, 80), Size = new Size(128, 30),
+                Cursor = Cursors.Hand
+            };
+            btnManual.FlatAppearance.BorderSize = 0;
+            pEntInput.Controls.Add(btnManual);
+
+            lblHoraIndicador = new Label
+            {
+                Text = "⚡ Hora actual",
+                Font = new Font("Segoe UI", 9f),
+                ForeColor = Color.FromArgb(130, 140, 165),
+                Location = new Point(148, 86), AutoSize = true
+            };
+            pEntInput.Controls.Add(lblHoraIndicador);
+
+            btnLimpiarHora = new Button
+            {
+                Text = "✕",
+                Font = new Font("Segoe UI", 8f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(160, 60, 50), BackColor = Color.Transparent,
+                FlatStyle = FlatStyle.Flat,
+                Location = new Point(325, 80), Size = new Size(26, 28), Cursor = Cursors.Hand,
+                Visible = false
+            };
+            btnLimpiarHora.FlatAppearance.BorderSize = 0;
+            pEntInput.Controls.Add(btnLimpiarHora);
+
+            btnManual.Click += (s, e) =>
+            {
+                var hora = AbrirSelectorHoraManual(_horaManual ?? DateTime.Now.TimeOfDay);
+                if (hora.HasValue)
+                {
+                    _horaManual = hora.Value;
+                    lblHoraIndicador.Text = $"🕒 {hora.Value.Hours:D2}:{hora.Value.Minutes:D2} (manual)";
+                    lblHoraIndicador.ForeColor = Color.FromArgb(180, 80, 20);
+                    btnLimpiarHora.Visible = true;
+                }
+            };
+            btnLimpiarHora.Click += (s, e) =>
+            {
+                _horaManual = null;
+                lblHoraIndicador.Text = "⚡ Hora actual";
+                lblHoraIndicador.ForeColor = Color.FromArgb(130, 140, 165);
+                btnLimpiarHora.Visible = false;
+            };
+
+            pEntTop.Controls.Add(pEntInput);
+
+            // [Fill] Ticket preview
+            panelTicketPreview = new Panel { Dock = DockStyle.Fill, BackColor = BlancoCard };
+            panelTicketPreview.Paint += PanelTicketPreview_Paint;
+
+            // Add to Panel1: Fill first, then Bottom, then Top (correct dock order)
+            split.Panel1.Controls.Add(panelTicketPreview);
+            split.Panel1.Controls.Add(pEntBot);
+            split.Panel1.Controls.Add(pEntTop);
+
+            // ════════════════════════════════════════════════════
+            // RIGHT PANEL — SALIDA
+            // Dock stacking order: Bottom first, then Top(s), then Fill
+            // ════════════════════════════════════════════════════
+
+            // [Bottom] Dos botones: Exonerar (izq) + Cobrar (der)
+            Panel pSalBot = new Panel { Dock = DockStyle.Bottom, Height = 64, BackColor = BlancoCard, Padding = new Padding(10, 8, 10, 8) };
+
+            btnExonerar = new Button
+            {
+                Text = "📝  Exonerar / Obs.",
+                Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+                ForeColor = Color.White, BackColor = Color.FromArgb(211, 84, 0),
+                FlatStyle = FlatStyle.Flat,
+                Location = new Point(10, 8), Size = new Size(180, 46),
+                Cursor = Cursors.Hand, Enabled = false
+            };
+            btnExonerar.FlatAppearance.BorderSize = 0;
+            btnExonerar.Click += BtnExonerar_Click;
+            pSalBot.Controls.Add(btnExonerar);
+
+            btnCobrarAbrir = new Button
+            {
+                Text = "💰  COBRAR Y ABRIR BARRERA",
+                Font = new Font("Segoe UI", 11f, FontStyle.Bold),
+                ForeColor = Color.White, BackColor = VerdeEsm,
+                FlatStyle = FlatStyle.Flat,
+                Location = new Point(198, 8), Size = new Size(pSalBot.Width - 210, 46),
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+                Cursor = Cursors.Hand, Enabled = false
+            };
+            btnCobrarAbrir.FlatAppearance.BorderSize = 0;
+            btnCobrarAbrir.Click += BtnCobrarAbrir_Click;
+            pSalBot.Controls.Add(btnCobrarAbrir);
+
+            // [Top] Title bar + input (con buscador de placa)
+            Panel pSalTop = new Panel { Dock = DockStyle.Top, Height = 160, BackColor = BlancoCard };
+
+            Panel pSalTitle = new Panel { Dock = DockStyle.Top, Height = 40, BackColor = Color.FromArgb(39, 129, 80) };
+            pSalTitle.Controls.Add(new Label
+            {
+                Text = "🚗  SALIDA — Cobro y Apertura",
+                Font = new Font("Segoe UI", 11f, FontStyle.Bold),
+                ForeColor = Color.White, Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Padding = new Padding(12, 0, 0, 0)
+            });
+            Panel pSalInput = new Panel { Dock = DockStyle.Fill, BackColor = BlancoCard };  // Fill added before Top so title appears first
+
+            // Buscador de placa
+            pSalInput.Controls.Add(new Label
+            {
+                Text = "🔎 Buscar por placa:",
+                Font = new Font("Segoe UI", 9f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(90, 110, 140),
+                Location = new Point(12, 8), AutoSize = true
+            });
+            txtBuscarPlaca = new TextBox
+            {
+                Location = new Point(12, 26), Size = new Size(170, 26),
+                Font = new Font("Segoe UI", 10f),
+                CharacterCasing = CharacterCasing.Upper,
+                PlaceholderText = "Filtrar placa...",
+                BorderStyle = BorderStyle.FixedSingle
+            };
+            txtBuscarPlaca.TextChanged += (s, e) => ActualizarComboTickets();
+            pSalInput.Controls.Add(txtBuscarPlaca);
+
+            Button btnLimpiarBusq = new Button
+            {
+                Text = "✕",
+                Font = new Font("Segoe UI", 9f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(160, 60, 50), BackColor = Color.FromArgb(250, 240, 240),
+                FlatStyle = FlatStyle.Flat,
+                Location = new Point(186, 26), Size = new Size(28, 26), Cursor = Cursors.Hand
+            };
+            btnLimpiarBusq.FlatAppearance.BorderSize = 0;
+            btnLimpiarBusq.Click += (s, e) => { txtBuscarPlaca.Text = ""; txtBuscarPlaca.Focus(); };
+            pSalInput.Controls.Add(btnLimpiarBusq);
+
+            // Combo de tickets activos filtrados
+            pSalInput.Controls.Add(new Label
+            {
+                Text = "Ticket activo:",
+                Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+                ForeColor = TextoOscuro, Location = new Point(12, 60), AutoSize = true
+            });
+            cmbTicketsActivos = new ComboBox
+            {
+                Location = new Point(12, 78), Size = new Size(245, 34),
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Font = new Font("Segoe UI", 10f)
+            };
+            pSalInput.Controls.Add(cmbTicketsActivos);
+            ActualizarComboTickets();
+            cmbTicketsActivos.SelectedIndexChanged += (s, e) => MostrarResumenCobro();
+
+            pSalInput.Controls.Add(new Label
+            {
+                Text = "🔍 Listo para escanear",
+                Font = new Font("Segoe UI", 9f, FontStyle.Italic),
+                ForeColor = Color.FromArgb(100, 120, 160),
+                Location = new Point(264, 86), AutoSize = true
+            });
+            pSalTop.Controls.Add(pSalInput);
+            pSalTop.Controls.Add(pSalTitle);  // Top added last so WinForms reverse-order docks it first
+
+            // [Fill] Resumen cobro
+            lblResumenCobro = new Label
+            {
+                Dock = DockStyle.Fill,
+                Font = new Font("Segoe UI", 11f),
+                ForeColor = TextoOscuro, BackColor = BlancoCard,
+                Text = "Escanee o seleccione un ticket activo\npara ver el resumen de cobro.",
+                TextAlign = ContentAlignment.TopLeft,
+                Padding = new Padding(14, 14, 14, 4)
+            };
+
+            split.Panel2.Controls.Add(lblResumenCobro);
+            split.Panel2.Controls.Add(pSalBot);
+            split.Panel2.Controls.Add(pSalTop);
+
+            ResumeLayout(true);
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // GENERAR TICKET
+        // ═══════════════════════════════════════════════════════════
+        private void GenerarTicket()
+        {
+            string placa = txtPlacaEntrada.Text.Trim().ToUpper();
+            if (string.IsNullOrEmpty(placa))
+            {
+                MessageBox.Show("Ingrese la placa del vehículo.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // Validar formato de placa ecuatoriana: ABC-1234 o ABC1234
+            if (!System.Text.RegularExpressions.Regex.IsMatch(placa, @"^[A-Z]{3}-?\d{3,4}$"))
+            {
+                MessageBox.Show("La placa debe tener formato ecuatoriano: ABC-1234 o ABC1234.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // Verificar que no exista ticket activo con la misma placa
+            if (TicketsActivos.Any(t => t.Activo && t.Placa.Equals(placa, StringComparison.OrdinalIgnoreCase)))
+            {
+                MessageBox.Show("Ya existe un ticket activo con esta placa.", "Duplicado", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            _contadorTickets++;
+            _ticketGenerado = new TicketVisitante
+            {
+                Codigo = $"V{_contadorTickets:D6}",
+                Placa = placa,
+                FechaEntrada = _horaManual.HasValue ? DateTime.Today.Add(_horaManual.Value) : DateTime.Now,
+                Activo = true,
+                EsMoto = rdMotoTicket.Checked
+            };
+            TicketsActivos.Add(_ticketGenerado);
+            GuardarTicketsEnArchivo();
+            CodigoTicket = _ticketGenerado.Codigo;
+            PlacaIngresada = placa;
+            ActualizarComboTickets();
+            panelTicketPreview.Invalidate();
+            txtPlacaEntrada.Text = "";
+
+            // Registrar aforo directamente (carro o moto según selección)
+            CapacidadService.RegistrarEntradaVisitante(_ticketGenerado.EsMoto);
+
+            // Registrar en bitácora global de auditoría
+            AuditoriaService.Registrar("ENTRÓ", "VISITANTE", "", $"Visitante ({_ticketGenerado.Codigo})", placa);
+
+            // Notificar al dashboard inmediatamente
+            OnVisitanteEntro?.Invoke(placa, _ticketGenerado.Codigo);
+
+            // Enviar ticket a la impresora térmica real ESC/POS
+            ImprimirTicketReal(_ticketGenerado);
+
+            // Abrir barrera tras generar ticket de entrada
+            OnAbrirBarrera?.Invoke();
+
+            // Auto-cerrar: regresa al dashboard sin quedarse en la sección de tickets
+            DialogResult = DialogResult.OK;
+            Close();
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // SELECTOR DE HORA MANUAL
+        // ═══════════════════════════════════════════════════════════
+        private TimeSpan? AbrirSelectorHoraManual(TimeSpan initial)
+        {
+            int hh = initial.Hours;
+            int mm = initial.Minutes;
+            TimeSpan? result = null;
+
+            Form dlg = new Form
+            {
+                ClientSize = new Size(284, 360),
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.None,
+                BackColor = Color.FromArgb(38, 50, 70),
+                ShowInTaskbar = false,
+                TopMost = true
+            };
+
+            // Header
+            Panel hdr = new Panel { Dock = DockStyle.Top, Height = 44, BackColor = Color.FromArgb(52, 73, 110) };
+            hdr.Controls.Add(new Label
+            {
+                Text = "🕒  INGRESO DE HORA",
+                Font = new Font("Segoe UI", 11f, FontStyle.Bold),
+                ForeColor = Color.White, Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleCenter
+            });
+            // X button
+            Button btnX = new Button
+            {
+                Text = "×",
+                Font = new Font("Segoe UI", 13f),
+                ForeColor = Color.FromArgb(200, 210, 230), BackColor = Color.Transparent,
+                FlatStyle = FlatStyle.Flat,
+                Location = new Point(254, 8), Size = new Size(28, 28), Cursor = Cursors.Hand
+            };
+            btnX.FlatAppearance.BorderSize = 0;
+            btnX.Click += (s, e) => dlg.Close();
+            hdr.Controls.Add(btnX);
+            dlg.Controls.Add(hdr);
+
+            // Column header labels
+            dlg.Controls.Add(new Label { Text = "Hora", Font = new Font("Segoe UI", 9f, FontStyle.Bold), ForeColor = Color.FromArgb(149, 175, 210), Location = new Point(56, 52), AutoSize = true });
+            dlg.Controls.Add(new Label { Text = "Minuto", Font = new Font("Segoe UI", 9f, FontStyle.Bold), ForeColor = Color.FromArgb(149, 175, 210), Location = new Point(190, 52), AutoSize = true });
+
+            // Arrow button factory
+            Button Arrow(string txt, Color bg, Point loc) => new Button
+            {
+                Text = txt,
+                Font = new Font("Segoe UI", 20f, FontStyle.Bold),
+                ForeColor = Color.White, BackColor = bg,
+                FlatStyle = FlatStyle.Flat,
+                Location = loc, Size = new Size(100, 50), Cursor = Cursors.Hand
+            };
+
+            var btnHUp = Arrow("▲", Color.FromArgb(39, 174, 96),  new Point(16,  68));
+            var btnHDn = Arrow("▼", Color.FromArgb(192, 57, 43),  new Point(16, 190));
+            var btnMUp = Arrow("▲", Color.FromArgb(39, 174, 96),  new Point(162, 68));
+            var btnMDn = Arrow("▼", Color.FromArgb(192, 57, 43),  new Point(162, 190));
+            foreach (var b in new[] { btnHUp, btnHDn, btnMUp, btnMDn })
+                b.FlatAppearance.BorderSize = 0;
+
+            // Hour/minute display panels (Paint-based, always redraws correctly)
+            Panel pnlHH = new Panel { BackColor = Color.FromArgb(38, 50, 70), Location = new Point(16, 122), Size = new Size(100, 66) };
+            pnlHH.Paint += (s, ev) =>
+            {
+                ev.Graphics.Clear(Color.FromArgb(38, 50, 70));
+                TextRenderer.DrawText(ev.Graphics, hh.ToString("D2"),
+                    new Font("Segoe UI", 38f, FontStyle.Bold),
+                    pnlHH.ClientRectangle, Color.White,
+                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            };
+
+            Panel pnlMM = new Panel { BackColor = Color.FromArgb(38, 50, 70), Location = new Point(162, 122), Size = new Size(100, 66) };
+            pnlMM.Paint += (s, ev) =>
+            {
+                ev.Graphics.Clear(Color.FromArgb(38, 50, 70));
+                TextRenderer.DrawText(ev.Graphics, mm.ToString("D2"),
+                    new Font("Segoe UI", 38f, FontStyle.Bold),
+                    pnlMM.ClientRectangle, Color.White,
+                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            };
+
+            // Colon separator panel
+            Panel pnlColon = new Panel { BackColor = Color.FromArgb(38, 50, 70), Location = new Point(120, 122), Size = new Size(26, 66) };
+            pnlColon.Paint += (s, ev) =>
+            {
+                ev.Graphics.Clear(Color.FromArgb(38, 50, 70));
+                TextRenderer.DrawText(ev.Graphics, ":",
+                    new Font("Segoe UI", 38f, FontStyle.Bold),
+                    pnlColon.ClientRectangle, Color.White,
+                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            };
+            dlg.Controls.Add(pnlColon);
+
+            void RefreshHora() { pnlHH.Invalidate(); pnlHH.Update(); pnlMM.Invalidate(); pnlMM.Update(); }
+            btnHUp.Click += (s, e) => { hh = (hh + 1) % 24; RefreshHora(); };
+            btnHDn.Click += (s, e) => { hh = (hh - 1 + 24) % 24; RefreshHora(); };
+            btnMUp.Click += (s, e) => { mm = (mm + 1) % 60; RefreshHora(); };
+            btnMDn.Click += (s, e) => { mm = (mm - 1 + 60) % 60; RefreshHora(); };
+
+            dlg.Controls.Add(btnHUp); dlg.Controls.Add(pnlHH); dlg.Controls.Add(btnHDn);
+            dlg.Controls.Add(btnMUp); dlg.Controls.Add(pnlMM); dlg.Controls.Add(btnMDn);
+
+            // Date strip
+            Panel dateStrip = new Panel { BackColor = Color.FromArgb(28, 38, 56), Location = new Point(0, 260), Size = new Size(284, 36) };
+            dateStrip.Controls.Add(new Label
+            {
+                Text = DateTime.Today.ToString("dd/MM/yyyy"),
+                Font = new Font("Segoe UI", 13f),
+                ForeColor = Color.FromArgb(180, 200, 230),
+                Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter
+            });
+            dlg.Controls.Add(dateStrip);
+
+            // Confirm button
+            Button btnOk = new Button
+            {
+                Text = "🕒  Pago con ingreso de hora",
+                Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+                ForeColor = Color.White, BackColor = Color.FromArgb(52, 73, 110),
+                FlatStyle = FlatStyle.Flat,
+                Location = new Point(10, 304), Size = new Size(264, 46), Cursor = Cursors.Hand
+            };
+            btnOk.FlatAppearance.BorderSize = 0;
+            btnOk.Click += (s, e) => { result = new TimeSpan(hh, mm, 0); dlg.Close(); };
+            dlg.Controls.Add(btnOk);
+
+            dlg.ShowDialog(this);
+            return result;
+        }
+
+        /// <summary>
+        /// Popup que simula la impresión del ticket con animación.
+        /// </summary>
+        private void MostrarPopupImpresion(TicketVisitante ticket)
+        {
+            Form popup = new Form
+            {
+                Text = "Imprimiendo Ticket",
+                ClientSize = new Size(460, 430),
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.None,
+                BackColor = BlancoCard,
+                ShowInTaskbar = false,
+                TopMost = true
+            };
+
+            popup.Paint += (s, ev) =>
+            {
+                using Pen borderPen = new Pen(AzulInst, 3);
+                ev.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                ev.Graphics.DrawRectangle(borderPen, 1, 1, popup.Width - 3, popup.Height - 3);
+                // Sombra sutil inferior
+                using Pen shadowPen = new Pen(Color.FromArgb(30, 0, 0, 0), 1);
+                ev.Graphics.DrawLine(shadowPen, 3, popup.Height - 1, popup.Width - 3, popup.Height - 1);
+            };
+
+            Panel barraAzul = new Panel { Dock = DockStyle.Top, Size = new Size(460, 6), BackColor = AzulInst };
+            popup.Controls.Add(barraAzul);
+
+            // Icono impresora
+            Label lblIcono = new Label
+            {
+                Text = "🖨",
+                Font = new Font("Segoe UI", 42f),
+                TextAlign = ContentAlignment.MiddleCenter,
+                Location = new Point(0, 15), Size = new Size(420, 70)
+            };
+            popup.Controls.Add(lblIcono);
+
+            Label lblTitulo = new Label
+            {
+                Text = "IMPRIMIENDO TICKET...",
+                Font = new Font("Segoe UI", 18f, FontStyle.Bold),
+                ForeColor = AzulInst,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Location = new Point(0, 95), Size = new Size(460, 40)
+            };
+            popup.Controls.Add(lblTitulo);
+
+            // Barra de progreso de impresión
+            Panel progressBg = new Panel
+            {
+                Location = new Point(50, 148), Size = new Size(360, 14),
+                BackColor = Color.FromArgb(230, 233, 236)
+            };
+            popup.Controls.Add(progressBg);
+
+            Panel progressFill = new Panel
+            {
+                Location = new Point(50, 148), Size = new Size(0, 14),
+                BackColor = AzulAccent
+            };
+            popup.Controls.Add(progressFill);
+            progressFill.BringToFront();
+
+            // Detalles del ticket
+            Panel sep = new Panel { Location = new Point(40, 175), Size = new Size(380, 1), BackColor = Color.FromArgb(220, 225, 230) };
+            popup.Controls.Add(sep);
+
+            int detY = 192;
+            void AddRow(string label, string value, bool bold = false)
+            {
+                Label lbl = new Label { Text = label, Font = new Font("Segoe UI", 10.5f), ForeColor = Color.FromArgb(127, 140, 141), Location = new Point(50, detY), AutoSize = true };
+                popup.Controls.Add(lbl);
+                Label val = new Label { Text = value, Font = new Font("Segoe UI", bold ? 13f : 11f, bold ? FontStyle.Bold : FontStyle.Regular), ForeColor = bold ? AzulInst : TextoOscuro, Location = new Point(200, detY), AutoSize = true };
+                popup.Controls.Add(val);
+                detY += bold ? 38 : 30;
+            }
+
+            AddRow("Código:", ticket.Codigo, bold: true);
+            AddRow("Placa:", ticket.Placa);
+            AddRow("Fecha:", ticket.FechaEntrada.ToString("dd/MM/yyyy"));
+            AddRow("Hora:", ticket.FechaEntrada.ToString("HH:mm:ss"));
+            AddRow("Tarifa:", $"${TARIFA_HORA}/hora");
+
+            Label lblEstado = new Label
+            {
+                Text = "⏳ Enviando a impresora...",
+                Font = new Font("Segoe UI", 9.5f),
+                ForeColor = Color.FromArgb(170, 175, 180),
+                TextAlign = ContentAlignment.MiddleCenter,
+                Location = new Point(0, 368), Size = new Size(460, 22)
+            };
+            popup.Controls.Add(lblEstado);
+
+            Button btnAceptar = new Button
+            {
+                Text = "ACEPTAR",
+                Font = new Font("Segoe UI", 11f, FontStyle.Bold),
+                ForeColor = Color.White, BackColor = AzulInst,
+                FlatStyle = FlatStyle.Flat,
+                Location = new Point(155, 392), Size = new Size(150, 40),
+                Cursor = Cursors.Hand, Enabled = false
+            };
+            btnAceptar.FlatAppearance.BorderSize = 0;
+            btnAceptar.Click += (s, ev) => { popup.DialogResult = DialogResult.OK; popup.Close(); };
+            popup.Controls.Add(btnAceptar);
+
+            // Animación de progreso
+            int step = 0;
+            var timer = new System.Windows.Forms.Timer { Interval = 60 };
+            timer.Tick += (ts, te) =>
+            {
+                step++;
+                int w = (int)(360.0 * step / 30);
+                progressFill.Width = Math.Min(w, 360);
+
+                if (step == 15) lblEstado.Text = "🖨 Imprimiendo...";
+                if (step >= 30)
+                {
+                    timer.Stop(); timer.Dispose();
+                    lblTitulo.Text = "✅ TICKET IMPRESO";
+                    lblTitulo.ForeColor = VerdeEsm;
+                    lblIcono.Text = "✅";
+                    lblEstado.Text = "Ticket impreso correctamente. Barrera abriéndose...";
+                    progressFill.BackColor = VerdeEsm;
+                    btnAceptar.Enabled = true;
+
+                    // Auto-cierre en 3 segundos
+                    var autoClose = new System.Windows.Forms.Timer { Interval = 3000 };
+                    autoClose.Tick += (ats, ate) =>
+                    {
+                        autoClose.Stop(); autoClose.Dispose();
+                        if (!popup.IsDisposed) { popup.DialogResult = DialogResult.OK; popup.Close(); }
+                    };
+                    autoClose.Start();
+                }
+            };
+            popup.Shown += (s, ev) => timer.Start();
+            popup.FormClosed += (s, ev) => { timer.Stop(); timer.Dispose(); };
+            popup.ShowDialog(this);
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // DIBUJO DEL TICKET — Preview con código de barras simulado
+        // ═══════════════════════════════════════════════════════════
+        private void PanelTicketPreview_Paint(object? sender, PaintEventArgs e)
+        {
+            var g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+
+            var rect = panelTicketPreview.ClientRectangle;
+
+            // Fondo ticket (papel)
+            using (SolidBrush bg = new SolidBrush(Color.FromArgb(252, 252, 250)))
+                g.FillRectangle(bg, rect);
+
+            // Borde punteado (ticket)
+            using (Pen borderPen = new Pen(Color.FromArgb(180, 180, 180), 1) { DashStyle = DashStyle.Dash })
+                g.DrawRectangle(borderPen, 5, 5, rect.Width - 11, rect.Height - 11);
+
+            if (_ticketGenerado == null)
+            {
+                using Font f = new Font("Segoe UI", 10f);
+                using SolidBrush b = new SolidBrush(Color.FromArgb(170, 170, 170));
+                StringFormat sf = new() { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                g.DrawString("El ticket generado se\nmostrará aquí", f, b, rect, sf);
+                return;
+            }
+
+            int y = 20, cx = rect.Width / 2;
+
+            // Logo / Encabezado
+            using (Font fLogo = new Font("Segoe UI", 14f, FontStyle.Bold))
+            using (SolidBrush bAzul = new SolidBrush(AzulOscuro))
+            {
+                StringFormat sfC = new() { Alignment = StringAlignment.Center };
+                g.DrawString("PUCESA", fLogo, bAzul, cx, y, sfC);
+            }
+            y += 30;
+
+            using (Font fSub = new Font("Segoe UI", 9f))
+            using (SolidBrush bGris = new SolidBrush(Color.FromArgb(120, 120, 120)))
+            {
+                StringFormat sfC = new() { Alignment = StringAlignment.Center };
+                g.DrawString("Sistema de Parqueadero — Ticket Visitante", fSub, bGris, cx, y, sfC);
+            }
+            y += 25;
+
+            // Línea separadora
+            using (Pen linePen = new Pen(Color.FromArgb(200, 200, 200), 1))
+                g.DrawLine(linePen, 20, y, rect.Width - 20, y);
+            y += 12;
+
+            // Datos del ticket
+            void DrawRow(string label, string value, Font? fV = null)
+            {
+                using Font fL = new Font("Segoe UI", 9f, FontStyle.Bold);
+                using Font fVal = fV ?? new Font("Segoe UI", 10f);
+                using SolidBrush bL = new SolidBrush(Color.FromArgb(100, 100, 100));
+                using SolidBrush bV = new SolidBrush(TextoOscuro);
+                g.DrawString(label, fL, bL, 25, y);
+                g.DrawString(value, fVal, bV, 150, y);
+                y += 26;
+            }
+
+            using (Font fBold = new Font("Segoe UI", 11f, FontStyle.Bold))
+                DrawRow("Código:", _ticketGenerado.Codigo, fBold);
+            DrawRow("Placa:", _ticketGenerado.Placa);
+            DrawRow("Fecha:", _ticketGenerado.FechaEntrada.ToString("dd/MM/yyyy"));
+            DrawRow("Hora:", _ticketGenerado.FechaEntrada.ToString("HH:mm:ss"));
+            DrawRow("Tarifa:", $"${TARIFA_HORA}/hora");
+            y += 10;
+
+            // Código de barras simulado
+            using (Pen linePen = new Pen(Color.FromArgb(200, 200, 200), 1))
+                g.DrawLine(linePen, 20, y, rect.Width - 20, y);
+            y += 12;
+
+            DibujarCodigoBarras(g, _ticketGenerado.Codigo, 40, y, rect.Width - 80, 38);
+            y += 68;
+
+            // QR simulado
+            DibujarQRSimulado(g, cx - 32, y, 64);
+            y += 78;
+
+            using (Font fSmall = new Font("Segoe UI", 7.5f))
+            using (SolidBrush bGrey = new SolidBrush(Color.FromArgb(150, 150, 150)))
+            {
+                StringFormat sfC = new() { Alignment = StringAlignment.Center };
+                g.DrawString("Conserve este ticket para la salida", fSmall, bGrey, cx, y, sfC);
+            }
+        }
+
+        private void DibujarCodigoBarras(Graphics g, string code, int x, int y, int w, int h)
+        {
+            var rnd = new Random(code.GetHashCode());
+            int barX = x;
+            while (barX < x + w)
+            {
+                int barW = rnd.Next(1, 4);
+                bool negro = rnd.Next(2) == 0;
+                if (negro)
+                {
+                    using SolidBrush b = new SolidBrush(Color.Black);
+                    g.FillRectangle(b, barX, y, barW, h);
+                }
+                barX += barW;
+            }
+            using Font f = new Font("Cascadia Code, Consolas", 8f);
+            using SolidBrush bText = new SolidBrush(TextoOscuro);
+            StringFormat sf = new() { Alignment = StringAlignment.Center };
+            g.DrawString(code, f, bText, x + w / 2, y + h + 3, sf);
+        }
+
+        private void DibujarQRSimulado(Graphics g, int x, int y, int size)
+        {
+            var rnd = new Random(42);
+            int cellSize = size / 8;
+            for (int row = 0; row < 8; row++)
+            {
+                for (int col = 0; col < 8; col++)
+                {
+                    bool dark = (row < 2 && col < 2) || (row < 2 && col > 5) || (row > 5 && col < 2) || rnd.Next(3) == 0;
+                    using SolidBrush b = new SolidBrush(dark ? Color.Black : Color.White);
+                    g.FillRectangle(b, x + col * cellSize, y + row * cellSize, cellSize, cellSize);
+                }
+            }
+            using Pen pen = new Pen(Color.Black, 1);
+            g.DrawRectangle(pen, x, y, size, size);
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // IMPRESIÓN TÉRMICA REAL — ESC/POS
+        // ═══════════════════════════════════════════════════════════
+        /// <summary>
+        /// Arma el ticket con EscPosBuilder y lo envía a la impresora usando RawPrinterHelper.
+        /// Si la impresora no responde, muestra un MessageBox sin bloquear la aplicación.
+        /// </summary>
+        private void ImprimirTicketReal(TicketVisitante ticket)
+        {
+            try
+            {
+                byte[] data = new EscPosBuilder()
+                    .Init()
+                    .Left()
+                    .TextLine("- Ticket perdido: $10.00")
+                    .TextLine("- Cancelar antes de salir")
+                    .Separator(32, '-')
+                    .Center()
+                    .Bold(true).DoubleHeight(true).TextLine("Parqueadero").TextLine("PUCESA").DoubleHeight(false).Bold(false)
+                    .TextLine($"{ticket.FechaEntrada:dd/MM/yyyy}  {ticket.FechaEntrada:HH:mm:ss}")
+                    .Separator(32, '-')
+                    .Left()
+                    .TextLine($"Codigo : {ticket.Codigo}")
+                    .TextLine($"Placa  : {ticket.Placa}")
+                    .TextLine($"Tarifa : ${TARIFA_HORA} / hora")
+                    .Separator(32, '-')
+                    .Center()
+                    .Barcode128(ticket.Codigo)
+                    .Feed(2)
+                    .FullCut()
+                    .Build();
+
+                RawPrinterHelper.SendBytesToPrinter(nombreImpresora, data);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"No se pudo imprimir el ticket.\n\n{ex.Message}",
+                    "Error de Impresión",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // ESCÁNER USB — Captura global por KeyPreview
+        // ═══════════════════════════════════════════════════════════
+        /// <summary>
+        /// Captura todas las pulsaciones del formulario (KeyPreview = true).
+        /// Lógica de tiempo: si la diferencia entre teclas es menor a 50 ms se trata
+        /// de una ráfaga del escáner; si es mayor, el operador está escribiendo y
+        /// el evento se deja pasar al control con foco.
+        /// Cuando llega un Enter precedido de una ráfaga rápida se procesa el código.
+        /// </summary>
+        /// <summary>
+        /// Recorre la cadena de ContainerControl para encontrar el control hoja
+        /// que realmente tiene el foco de entrada (puede estar profundamente anidado).
+        /// </summary>
+        private static Control? GetDeepFocused(ContainerControl root)
+        {
+            Control? active = root.ActiveControl;
+            if (active is ContainerControl cc && cc.ActiveControl != null)
+                return GetDeepFocused(cc);
+            return active;
+        }
+
+        protected override void OnKeyPress(KeyPressEventArgs e)
+        {
+            base.OnKeyPress(e);
+
+            // Solo bloquear captura cuando el foco está en el TextBox de la placa (operador escribiendo).
+            // El ComboBox de tickets NO bloquea: el escáner siempre debe procesarse aunque el combo tenga foco.
+            var focused = GetDeepFocused(this);
+            if (focused is TextBox)
+                return;
+
+            var now = DateTime.Now;
+            var elapsed = (now - _lastKeyTime).TotalMilliseconds;
+            _lastKeyTime = now;
+
+            if (e.KeyChar == '\r')   // Enter = terminador del escáner
+            {
+                string codigo = _scanBuffer.ToString().Trim();
+                _scanBuffer.Clear();
+
+                // Procesar si el buffer fue llenado por una ráfaga rápida del escáner
+                // y el Enter llegó poco después (tolerancia 300 ms, algunos scanners pausan antes del Enter).
+                if (!string.IsNullOrEmpty(codigo) && _bufferBuiltByScanner && elapsed < 300.0)
+                {
+                    _bufferBuiltByScanner = false;
+                    ProcesarCodigoEscaneado(codigo);
+                    e.Handled = true;
+                }
+                _bufferBuiltByScanner = false;
+            }
+            else if (e.KeyChar >= 32)   // Carácter imprimible
+            {
+                if (_scanBuffer.Length > 0 && elapsed < SCANNER_INTER_KEY_MS)
+                {
+                    // Chars llegando en ráfaga rápida → confirmar origen en escáner
+                    _bufferBuiltByScanner = true;
+                }
+                else if (_scanBuffer.Length > 0 && elapsed >= SCANNER_INTER_KEY_MS)
+                {
+                    // Pausa larga detectada: el operador tecleó manualmente; descartar buffer
+                    _scanBuffer.Clear();
+                    _bufferBuiltByScanner = false;
+                }
+                // Si buffer estaba vacío: primer char, fuente aún desconocida (no tocar _bufferBuiltByScanner)
+
+                _scanBuffer.Append(e.KeyChar);
+                e.Handled = true;   // Suprimir para que no llegue a controles de fondo
+            }
+        }
+
+        /// <summary>
+        /// Localiza el código escaneado entre los tickets activos, lo selecciona
+        /// automáticamente en el ComboBox y despliega el resumen de cobro.
+        /// El operador solo tiene que hacer clic en "Cobrar y Abrir Barrera".
+        /// </summary>
+        private void ProcesarCodigoEscaneado(string codigo)
+        {
+            var activos = TicketsActivos.Where(t => t.Activo).ToList();
+            var ticket = activos.FirstOrDefault(
+                t => t.Codigo.Equals(codigo, StringComparison.OrdinalIgnoreCase));
+
+            if (ticket == null)
+            {
+                MessageBox.Show(
+                    $"No se encontró un ticket activo con el código \u201c{codigo}\u201d.\n" +
+                    $"Verifique que el ticket sea válido y esté activo.",
+                    "Ticket No Encontrado",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
+            }
+
+            // Seleccionar en el combo para que el operador vea cuál se procesó
+            int idx = activos.IndexOf(ticket);
+            if (idx >= 0 && idx < cmbTicketsActivos.Items.Count)
+                cmbTicketsActivos.SelectedIndex = idx;
+
+            // Auto-cobro: sin necesidad de pulsar ningún botón
+            EjecutarCobroAuto(ticket);
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // DIÁLOGO DE CONFIRMACIÓN DE PAGO
+        // Muestra la factura al operador y espera que confirme antes de cobrar.
+        // ═══════════════════════════════════════════════════════════
+        internal static bool MostrarConfirmarPago(
+            Form owner, TicketVisitante ticket, TimeSpan perm, decimal horas, decimal total)
+        {
+            bool confirmado = false;
+
+            Form dlg = new Form
+            {
+                Text = "Cobro de Visitante",
+                ClientSize = new Size(460, 500),
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.None,
+                BackColor = BlancoCard,
+                ShowInTaskbar = false,
+                TopMost = true
+            };
+
+            dlg.Paint += (s, ev) =>
+            {
+                using Pen pen = new Pen(AzulOscuro, 3);
+                ev.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                ev.Graphics.DrawRectangle(pen, 1, 1, dlg.Width - 3, dlg.Height - 3);
+            };
+
+            // Header
+            Panel hdr = new Panel { Dock = DockStyle.Top, Height = 50, BackColor = AzulOscuro };
+            hdr.Controls.Add(new Label
+            {
+                Text = "💰  FACTURA DE COBRO",
+                Font = new Font("Segoe UI", 14f, FontStyle.Bold),
+                ForeColor = Color.White,
+                Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleCenter
+            });
+            dlg.Controls.Add(hdr);
+
+            // Total panel
+            Panel panelTotal = new Panel
+            {
+                Location = new Point(0, 60),
+                Size = new Size(460, 100),
+                BackColor = Color.FromArgb(240, 248, 255)
+            };
+            panelTotal.Controls.Add(new Label
+            {
+                Text = "TOTAL A COBRAR",
+                Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(100, 120, 150),
+                Location = new Point(0, 10), Size = new Size(460, 20),
+                TextAlign = ContentAlignment.MiddleCenter
+            });
+            panelTotal.Controls.Add(new Label
+            {
+                Text = $"${total:F2}",
+                Font = new Font("Segoe UI", 38f, FontStyle.Bold),
+                ForeColor = VerdeEsm,
+                Location = new Point(0, 34), Size = new Size(460, 58),
+                TextAlign = ContentAlignment.MiddleCenter
+            });
+            dlg.Controls.Add(panelTotal);
+
+            // Separator
+            dlg.Controls.Add(new Panel { Location = new Point(30, 166), Size = new Size(400, 1), BackColor = Color.FromArgb(210, 218, 230) });
+
+            // Details
+            int dy = 178;
+            void Row(string lbl, string val, Color? vc = null)
+            {
+                dlg.Controls.Add(new Label { Text = lbl, Font = new Font("Segoe UI", 10f), ForeColor = Color.FromArgb(110, 125, 145), Location = new Point(40, dy), AutoSize = true });
+                dlg.Controls.Add(new Label { Text = val, Font = new Font("Segoe UI", 10.5f, FontStyle.Bold), ForeColor = vc ?? TextoOscuro, Location = new Point(230, dy), AutoSize = true });
+                dy += 28;
+            }
+
+            Row("Ticket:",        ticket.Codigo, AzulInst);
+            Row("Placa:",         ticket.Placa);
+            Row("Entrada:",       ticket.FechaEntrada.ToString("dd/MM/yyyy  HH:mm:ss"));
+            Row("Salida:",        DateTime.Now.ToString("dd/MM/yyyy  HH:mm:ss"));
+            Row("Permanencia:",   $"{(int)perm.TotalHours}h  {perm.Minutes}m  {perm.Seconds}s");
+            Row("Horas cobradas:", $"{horas}  ×  ${TARIFA_HORA}/hora");
+
+            // Separator 2
+            dlg.Controls.Add(new Panel { Location = new Point(30, dy + 4), Size = new Size(400, 1), BackColor = Color.FromArgb(210, 218, 230) });
+            dy += 18;
+
+            // Confirm button
+            Button btnOk = new Button
+            {
+                Text = "✓   PAGADO — CONFIRMAR COBRO",
+                Font = new Font("Segoe UI", 12f, FontStyle.Bold),
+                ForeColor = Color.White, BackColor = VerdeEsm,
+                FlatStyle = FlatStyle.Flat,
+                Location = new Point(30, dy + 8), Size = new Size(400, 54),
+                Cursor = Cursors.Hand
+            };
+            btnOk.FlatAppearance.BorderSize = 0;
+            btnOk.Click += (s, ev) => { confirmado = true; dlg.Close(); };
+            dlg.Controls.Add(btnOk);
+
+            // Cancel button
+            Button btnCancel = new Button
+            {
+                Text = "✕  Cancelar  (el ticket permanece activo)",
+                Font = new Font("Segoe UI", 9f),
+                ForeColor = Color.FromArgb(160, 160, 165), BackColor = Color.Transparent,
+                FlatStyle = FlatStyle.Flat,
+                Location = new Point(80, dy + 70), Size = new Size(300, 28),
+                Cursor = Cursors.Hand
+            };
+            btnCancel.FlatAppearance.BorderSize = 0;
+            btnCancel.FlatAppearance.MouseOverBackColor = Color.FromArgb(245, 245, 248);
+            btnCancel.Click += (s, ev) => dlg.Close();
+            dlg.Controls.Add(btnCancel);
+
+            dlg.ShowDialog(owner);
+            return confirmado;
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // COBRO AUTOMÁTICO (disparado por escáner o botón manual)
+        // 1) Muestra factura → 2) Espera confirmación → 3) Cobra, imprime, abre barrera
+        // ═══════════════════════════════════════════════════════════
+        private void EjecutarCobroAuto(TicketVisitante ticket)
+        {
+            // 1. Pre-calcular tarifa SIN modificar el ticket todavía
+            var fechaSalida = DateTime.Now;
+            var permanencia = fechaSalida - ticket.FechaEntrada;
+            decimal horas = (decimal)Math.Ceiling(permanencia.TotalHours);
+            if (horas < 1) horas = 1;
+            decimal total = horas * TARIFA_HORA;
+
+            // 2. Mostrar factura y esperar confirmación del operador
+            if (!MostrarConfirmarPago(this, ticket, permanencia, horas, total))
+            {
+                // Cancelado: ticket sigue activo, restaurar combo y botón
+                ActualizarComboTickets();
+                return;
+            }
+
+            // 3. Confirmar: marcar como pagado
+            ticket.FechaSalida = fechaSalida;
+            ticket.TotalPagar = total;
+            ticket.Activo = false;
+            GuardarTicketsEnArchivo();
+            CodigoTicket = ticket.Codigo;
+            PlacaIngresada = ticket.Placa;
+            UltimaAccion = "salida";
+            _ticketSalida = null;
+            ActualizarComboTickets();
+            btnCobrarAbrir.Enabled = false;
+
+            // 4. Mostrar resumen en pantalla
+            lblResumenCobro.Text =
+                $"╔═════════  COBRO CONFIRMADO  ═════════╗\n\n" +
+                $"  📋  Ticket:       {ticket.Codigo}\n" +
+                $"  🚗  Placa:         {ticket.Placa}\n\n" +
+                $"  📅  Entrada:      {ticket.FechaEntrada:dd/MM/yyyy HH:mm:ss}\n" +
+                $"  📅  Salida:        {ticket.FechaSalida:dd/MM/yyyy HH:mm:ss}\n\n" +
+                $"  ⏱  Permanencia: {(int)permanencia.TotalHours}h {permanencia.Minutes}m {permanencia.Seconds}s\n" +
+                $"  💵  Tarifa:         ${TARIFA_HORA}/hora  ×  {horas} hora(s)\n\n" +
+                $"╚══════════════════════════════════╗\n" +
+                $"   💰  TOTAL COBRADO:  ${ticket.TotalPagar:F2}\n" +
+                $"╘══════════════════════════════════╝";
+
+            // 5. Imprimir factura de salida
+            ImprimirFacturaSalida(ticket);
+
+            // 6. Registrar salida de aforo directamente (carro o moto según ticket)
+            CapacidadService.RegistrarSalidaVisitante(ticket.EsMoto);
+
+            // Registrar en bitácora global de auditoría
+            AuditoriaService.Registrar("SALIÓ", "VISITANTE", "", $"Visitante ({ticket.Codigo})", ticket.Placa);
+
+            // 7. Notificar dashboard y popup cobro exitoso
+            OnVisitanteSalio?.Invoke(ticket.Placa, ticket.Codigo, ticket.TotalPagar);
+            MostrarPopupCobroExitoso(this, ticket);
+
+            // 7. Abrir barrera
+            OnAbrirBarrera?.Invoke();
+
+            lblResumenCobro.Text = "Escanee o seleccione un ticket activo\npara ver el resumen de cobro.";
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // IMPRIMIR FACTURA DE SALIDA (mini comprobante de cobro)
+        // ═══════════════════════════════════════════════════════════
+        private void ImprimirFacturaSalida(TicketVisitante ticket)
+        {
+            try
+            {
+                var perm = ticket.FechaSalida!.Value - ticket.FechaEntrada;
+                decimal horasCobradas = (decimal)Math.Ceiling(perm.TotalHours);
+                if (horasCobradas < 1) horasCobradas = 1;
+
+                byte[] data = new EscPosBuilder()
+                    .Init()
+                    .Left()
+                    .TextLine("- Ticket perdido: $10.00")
+                    .TextLine("- Cancelar antes de salir")
+                    .Separator(32, '-')
+                    .Center()
+                    .Bold(true).DoubleHeight(true).TextLine("Parqueadero").TextLine("PUCESA").DoubleHeight(false).Bold(false)
+                    .TextLine("Av. Los Chasquis s/n, Ambato")
+                    .Separator(32, '-')
+                    .Left()
+                    .TextLine($"Comprobante: {ticket.Codigo}")
+                    .TextLine("Cliente    : Visitante")
+                    .Separator(32, '-')
+                    .TextLine($"Hora de llegada:")
+                    .TextLine($"  {ticket.FechaEntrada:dd/MM/yyyy  HH:mm:ss}")
+                    .TextLine($"Hora de salida:")
+                    .TextLine($"  {ticket.FechaSalida:dd/MM/yyyy  HH:mm:ss}")
+                    .TextLine($"Placa      : {ticket.Placa}")
+                    .TextLine($"Permanencia: {(int)perm.TotalHours}h {perm.Minutes}m {perm.Seconds}s")
+                    .TextLine($"Horas cobradas: {horasCobradas}")
+                    .TextLine($"Tarifa     : ${TARIFA_HORA} / hora")
+                    .Separator(32, '=')
+                    .Center()
+                    .Bold(true)
+                    .TextLine("Total a pagar:")
+                    .DoubleHeight(true)
+                    .TextLine($"  ${ticket.TotalPagar:F2}")
+                    .DoubleHeight(false).Bold(false)
+                    .Feed(4)
+                    .FullCut()
+                    .Build();
+
+                RawPrinterHelper.SendBytesToPrinter(nombreImpresora, data);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"No se pudo imprimir la factura de salida.\n\n{ex.Message}",
+                    "Error de Impresión",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // SALIDA — RESUMEN DE COBRO
+        // ═══════════════════════════════════════════════════════════
+        private void MostrarResumenCobro()
+        {
+            var filtro = txtBuscarPlaca?.Text.Trim().ToUpper() ?? "";
+            var activos = TicketsActivos.Where(t => t.Activo &&
+                (string.IsNullOrEmpty(filtro) || t.Placa.Contains(filtro))).ToList();
+            int idx = cmbTicketsActivos.SelectedIndex;
+            if (idx < 0 || idx >= activos.Count) return;
+
+            _ticketSalida = activos[idx];
+            _ticketSalida.FechaSalida = DateTime.Now;
+
+            var permanencia = _ticketSalida.FechaSalida.Value - _ticketSalida.FechaEntrada;
+            decimal horas = (decimal)Math.Ceiling(permanencia.TotalHours);
+            if (horas < 1) horas = 1;
+            _ticketSalida.TotalPagar = horas * TARIFA_HORA;
+
+            lblResumenCobro.Text =
+                $"━━━━━  RESUMEN DE COBRO  ━━━━━\n\n" +
+                $"📋  Ticket:         {_ticketSalida.Codigo}\n" +
+                $"🚗  Placa:          {_ticketSalida.Placa}\n\n" +
+                $"📅  Entrada:       {_ticketSalida.FechaEntrada:dd/MM/yyyy HH:mm:ss}\n" +
+                $"📅  Salida:          {_ticketSalida.FechaSalida:dd/MM/yyyy HH:mm:ss}\n\n" +
+                $"⏱  Permanencia:  {permanencia.Hours}h {permanencia.Minutes}m\n" +
+                $"💵  Tarifa:           ${TARIFA_HORA}/hora\n\n" +
+                $"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+                $"   💰  TOTAL A PAGAR:  ${_ticketSalida.TotalPagar:F2}\n" +
+                $"━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+
+            btnCobrarAbrir.Enabled = true;
+            btnExonerar.Enabled = true;
+        }
+
+        private void ActualizarComboTickets()
+        {
+            int prevIdx = cmbTicketsActivos.SelectedIndex;
+            cmbTicketsActivos.Items.Clear();
+            var filtro = txtBuscarPlaca?.Text.Trim().ToUpper() ?? "";
+            var lista = TicketsActivos.Where(t => t.Activo &&
+                (string.IsNullOrEmpty(filtro) || t.Placa.Contains(filtro))).ToList();
+            foreach (var t in lista)
+                cmbTicketsActivos.Items.Add($"{t.Codigo} | {t.Placa} | {t.FechaEntrada:HH:mm}");
+            if (cmbTicketsActivos.Items.Count > 0)
+                cmbTicketsActivos.SelectedIndex = (prevIdx >= 0 && prevIdx < cmbTicketsActivos.Items.Count) ? prevIdx : 0;
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // COBRAR Y ABRIR
+        // ═══════════════════════════════════════════════════════════
+        private void BtnCobrarAbrir_Click(object? sender, EventArgs e)
+        {
+            if (_ticketSalida == null) return;
+            var ticket = _ticketSalida;
+            _ticketSalida = null;
+            btnCobrarAbrir.Enabled = false;
+            btnExonerar.Enabled = false;
+            EjecutarCobroAuto(ticket);
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // EXONERAR / OBSERVACIÓN
+        // ═══════════════════════════════════════════════════════════
+        private void BtnExonerar_Click(object? sender, EventArgs e)
+        {
+            if (_ticketSalida == null) return;
+            var ticket = _ticketSalida;
+
+            // Pre-calcular para mostrar el valor original en el diálogo
+            var perm = DateTime.Now - ticket.FechaEntrada;
+            decimal horas = (decimal)Math.Ceiling(perm.TotalHours);
+            if (horas < 1) horas = 1;
+            decimal totalOriginal = horas * TARIFA_HORA;
+
+            EjecutarExoneracion(this, ticket, perm, horas, totalOriginal);
+        }
+
+        private void EjecutarExoneracion(
+            Form owner, TicketVisitante ticket, TimeSpan perm, decimal horas, decimal totalOriginal)
+        {
+            // ─────── Diálogo de exoneración ───────────────────
+            Form dlg = new Form
+            {
+                Text = "Exonerar / Observación",
+                ClientSize = new Size(440, 390),
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.None,
+                BackColor = BlancoCard,
+                ShowInTaskbar = false,
+                TopMost = true
+            };
+            dlg.Paint += (s, ev) =>
+            {
+                using Pen pen = new Pen(Color.FromArgb(211, 84, 0), 3);
+                ev.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                ev.Graphics.DrawRectangle(pen, 1, 1, dlg.Width - 3, dlg.Height - 3);
+            };
+
+            Panel hdr = new Panel { Dock = DockStyle.Top, Height = 48, BackColor = Color.FromArgb(211, 84, 0) };
+            hdr.Controls.Add(new Label
+            {
+                Text = "📝  EXONERAR / OBSERVACIÓN",
+                Font = new Font("Segoe UI", 13f, FontStyle.Bold),
+                ForeColor = Color.White, Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleCenter
+            });
+            dlg.Controls.Add(hdr);
+
+            int dy = 62;
+            void AddInfo(string lbl, string val)
+            {
+                dlg.Controls.Add(new Label { Text = lbl, Font = new Font("Segoe UI", 9.5f), ForeColor = Color.FromArgb(120, 130, 145), Location = new Point(24, dy), AutoSize = true });
+                dlg.Controls.Add(new Label { Text = val, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold), ForeColor = TextoOscuro, Location = new Point(180, dy), AutoSize = true });
+                dy += 24;
+            }
+            AddInfo("Ticket:", ticket.Codigo);
+            AddInfo("Placa:", ticket.Placa);
+            AddInfo("Permanencia:", $"{(int)perm.TotalHours}h {perm.Minutes}m");
+            AddInfo("Tarifa normal:", $"${totalOriginal:F2}");
+            dy += 4;
+
+            // Observación
+            dlg.Controls.Add(new Label
+            {
+                Text = "Motivo / Observación:",
+                Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(211, 84, 0),
+                Location = new Point(24, dy), AutoSize = true
+            });
+            dy += 22;
+            TextBox txtObs = new TextBox
+            {
+                Location = new Point(24, dy), Size = new Size(392, 52),
+                Font = new Font("Segoe UI", 10f),
+                Multiline = true, MaxLength = 200,
+                PlaceholderText = "Ej: Invitado del Director, ticket perdido...",
+                BorderStyle = BorderStyle.FixedSingle
+            };
+            dlg.Controls.Add(txtObs);
+            dy += 60;
+
+            // Nuevo monto
+            dlg.Controls.Add(new Label
+            {
+                Text = "Nuevo monto a cobrar ($):",
+                Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(211, 84, 0),
+                Location = new Point(24, dy), AutoSize = true
+            });
+            var txtMonto = new TextBox
+            {
+                Text = totalOriginal.ToString("F2"),
+                Location = new Point(260, dy - 2), Size = new Size(100, 28),
+                Font = new Font("Segoe UI", 12f, FontStyle.Bold),
+                TextAlign = HorizontalAlignment.Right,
+                BorderStyle = BorderStyle.FixedSingle
+            };
+            dlg.Controls.Add(txtMonto);
+            dy += 38;
+
+            // Sep
+            dlg.Controls.Add(new Panel { Location = new Point(24, dy), Size = new Size(392, 1), BackColor = Color.FromArgb(220, 220, 220) });
+            dy += 10;
+
+            Button btnOk = new Button
+            {
+                Text = "✓  APLICAR Y COBRAR",
+                Font = new Font("Segoe UI", 11f, FontStyle.Bold),
+                ForeColor = Color.White, BackColor = Color.FromArgb(211, 84, 0),
+                FlatStyle = FlatStyle.Flat,
+                Location = new Point(24, dy), Size = new Size(220, 46), Cursor = Cursors.Hand
+            };
+            btnOk.FlatAppearance.BorderSize = 0;
+            Button btnCancelar = new Button
+            {
+                Text = "Cancelar",
+                Font = new Font("Segoe UI", 10f),
+                ForeColor = Color.FromArgb(130, 135, 145), BackColor = Color.Transparent,
+                FlatStyle = FlatStyle.Flat,
+                Location = new Point(258, dy), Size = new Size(158, 46), Cursor = Cursors.Hand
+            };
+            btnCancelar.FlatAppearance.BorderSize = 0;
+            dlg.Controls.Add(btnOk);
+            dlg.Controls.Add(btnCancelar);
+
+            bool confirmado = false;
+            string observacion = "";
+            decimal nuevoMonto = totalOriginal;
+
+            btnOk.Click += (s, ev) =>
+            {
+                string obsText = txtObs.Text.Trim();
+                if (string.IsNullOrEmpty(obsText))
+                {
+                    MessageBox.Show("Ingrese el motivo de la exoneración.", "Requerido",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+                if (!decimal.TryParse(txtMonto.Text.Replace(",", "."),
+                    System.Globalization.NumberStyles.Any,
+                    System.Globalization.CultureInfo.InvariantCulture, out decimal m) || m < 0)
+                {
+                    MessageBox.Show("Monto inválido. Use un número positivo o 0.",
+                        "Monto", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+                observacion = obsText;
+                nuevoMonto = m;
+                confirmado = true;
+                dlg.Close();
+            };
+            btnCancelar.Click += (s, ev) => dlg.Close();
+            dlg.ShowDialog(owner);
+
+            if (!confirmado) return;
+
+            // Aplicar exoneración
+            var fechaSalida = DateTime.Now;
+            ticket.FechaSalida = fechaSalida;
+            ticket.TotalPagar = nuevoMonto;
+            ticket.Observacion = observacion;
+            ticket.Activo = false;
+            GuardarTicketsEnArchivo();
+
+            CodigoTicket = ticket.Codigo;
+            PlacaIngresada = ticket.Placa;
+            UltimaAccion = "salida";
+            _ticketSalida = null;
+            ActualizarComboTickets();
+            btnCobrarAbrir.Enabled = false;
+            btnExonerar.Enabled = false;
+
+            lblResumenCobro.Text =
+                $"  📋  Ticket:      {ticket.Codigo}\n" +
+                $"  🚗  Placa:       {ticket.Placa}\n" +
+                $"  📝  Obs.:        {observacion}\n" +
+                $"  💵  Cobrado:    ${nuevoMonto:F2} (original: ${totalOriginal:F2})";
+
+            ImprimirFacturaExoneracion(ticket, observacion, nuevoMonto, totalOriginal, perm);
+            AuditoriaService.Registrar("SALIÓ", "VISITANTE", "", $"Visitante Exonerado ({ticket.Codigo})", ticket.Placa);
+            OnVisitanteSalio?.Invoke(ticket.Placa, ticket.Codigo, nuevoMonto);
+            MostrarPopupCobroExitoso(this, ticket);
+            OnAbrirBarrera?.Invoke();
+
+            lblResumenCobro.Text = "Escanee o seleccione un ticket activo\npara ver el resumen de cobro.";
+        }
+
+        private void ImprimirFacturaExoneracion(
+            TicketVisitante ticket, string obs, decimal nuevoMonto, decimal totalOriginal, TimeSpan perm)
+        {
+            try
+            {
+                byte[] data = new EscPosBuilder()
+                    .Init()
+                    .Left()
+                    .TextLine("- Ticket perdido: $10.00")
+                    .TextLine("- Cancelar antes de salir")
+                    .Separator(32, '-')
+                    .Center()
+                    .Bold(true).DoubleHeight(true).TextLine("Parqueadero").TextLine("PUCESA").DoubleHeight(false).Bold(false)
+                    .TextLine("Av. Los Chasquis s/n, Ambato")
+                    .Separator(32, '-')
+                    .Left()
+                    .TextLine($"Comprobante: {ticket.Codigo}")
+                    .TextLine("Cliente    : Visitante")
+                    .TextLine($"Obs.       : {obs}")
+                    .Separator(32, '-')
+                    .TextLine($"Hora llegada:")
+                    .TextLine($"  {ticket.FechaEntrada:dd/MM/yyyy  HH:mm:ss}")
+                    .TextLine($"Hora salida:")
+                    .TextLine($"  {ticket.FechaSalida:dd/MM/yyyy  HH:mm:ss}")
+                    .TextLine($"Placa      : {ticket.Placa}")
+                    .TextLine($"Permanencia: {(int)perm.TotalHours}h {perm.Minutes}m {perm.Seconds}s")
+                    .TextLine($"Tarifa norm: ${totalOriginal:F2}")
+                    .Separator(32, '=')
+                    .Center()
+                    .Bold(true)
+                    .TextLine("Total cobrado (exonerado):")
+                    .DoubleHeight(true)
+                    .TextLine($"  ${nuevoMonto:F2}")
+                    .DoubleHeight(false).Bold(false)
+                    .Feed(4)
+                    .FullCut()
+                    .Build();
+                RawPrinterHelper.SendBytesToPrinter(nombreImpresora, data);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"No se pudo imprimir.\n\n{ex.Message}",
+                    "Error de Impresión", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // COBRAR Y ABRIR — Popup personalizado de cobro exitoso
+        internal static void MostrarPopupCobroExitoso(Form owner, TicketVisitante ticket)
+        {
+            Form popup = new Form
+            {
+                Text = "Cobro Exitoso",
+                ClientSize = new Size(420, 380),
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.None,
+                BackColor = BlancoCard,
+                ShowInTaskbar = false,
+                TopMost = true
+            };
+
+            // Borde redondeado visual
+            popup.Paint += (s, ev) =>
+            {
+                using Pen borderPen = new Pen(VerdeEsm, 3);
+                ev.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                ev.Graphics.DrawRectangle(borderPen, 1, 1, popup.Width - 3, popup.Height - 3);
+            };
+
+            // ── Barra superior verde ──
+            Panel barraVerde = new Panel
+            {
+                Dock = DockStyle.Top, Size = new Size(420, 4),
+                BackColor = VerdeEsm
+            };
+            popup.Controls.Add(barraVerde);
+
+            // ── Círculo con checkmark ──
+            Panel circlePanel = new Panel
+            {
+                Location = new Point(160, 25), Size = new Size(100, 100),
+                BackColor = Color.Transparent
+            };
+            circlePanel.Paint += (s, ev) =>
+            {
+                var g = ev.Graphics;
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+
+                // Círculo verde con gradiente
+                using (LinearGradientBrush grad = new LinearGradientBrush(new Rectangle(0, 0, 100, 100), VerdeEsm, Color.FromArgb(34, 139, 34), 45f))
+                    g.FillEllipse(grad, 5, 5, 90, 90);
+
+                // Sombra del círculo
+                using (SolidBrush shadow = new SolidBrush(Color.FromArgb(20, 0, 0, 0)))
+                    g.FillEllipse(shadow, 8, 92, 84, 8);
+
+                // Checkmark blanco grueso
+                using Pen check = new Pen(Color.White, 6) { LineJoin = LineJoin.Round, StartCap = LineCap.Round, EndCap = LineCap.Round };
+                g.DrawLine(check, 25, 50, 42, 68);
+                g.DrawLine(check, 42, 68, 75, 32);
+            };
+            popup.Controls.Add(circlePanel);
+
+            // ── Texto principal ──
+            Label lblExito = new Label
+            {
+                Text = "¡COBRO EXITOSO!",
+                Font = new Font("Segoe UI", 18f, FontStyle.Bold),
+                ForeColor = VerdeEsm,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Location = new Point(0, 135), Size = new Size(420, 40)
+            };
+            popup.Controls.Add(lblExito);
+
+            Label lblSub = new Label
+            {
+                Text = "Barrera abriéndose...",
+                Font = new Font("Segoe UI", 10f),
+                ForeColor = Color.FromArgb(127, 140, 141),
+                TextAlign = ContentAlignment.MiddleCenter,
+                Location = new Point(0, 170), Size = new Size(420, 24)
+            };
+            popup.Controls.Add(lblSub);
+
+            // ── Detalles ──
+            Panel sep = new Panel { Location = new Point(40, 202), Size = new Size(340, 1), BackColor = Color.FromArgb(220, 225, 230) };
+            popup.Controls.Add(sep);
+
+            void AddDetailRow(string label, string value, ref int yy, bool bold = false)
+            {
+                Label lbl = new Label { Text = label, Font = new Font("Segoe UI", 10f), ForeColor = Color.FromArgb(127, 140, 141), Location = new Point(50, yy), AutoSize = true };
+                popup.Controls.Add(lbl);
+                Label val = new Label
+                {
+                    Text = value,
+                    Font = new Font("Segoe UI", bold ? 12f : 10f, bold ? FontStyle.Bold : FontStyle.Regular),
+                    ForeColor = bold ? VerdeEsm : TextoOscuro,
+                    Location = new Point(200, yy), AutoSize = true
+                };
+                popup.Controls.Add(val);
+                yy += bold ? 35 : 28;
+            }
+
+            int detY = 215;
+            AddDetailRow("Ticket:", ticket.Codigo, ref detY);
+            AddDetailRow("Placa:", ticket.Placa, ref detY);
+            AddDetailRow("Total pagado:", $"${ticket.TotalPagar:F2}", ref detY, bold: true);
+
+            // ── Barra de progreso de auto-cierre ──
+            Panel progressBar = new Panel
+            {
+                Location = new Point(0, popup.Height - 5),
+                Size = new Size(popup.Width, 5),
+                BackColor = VerdeEsm
+            };
+            popup.Controls.Add(progressBar);
+
+            Label lblTimer = new Label
+            {
+                Text = "Se cerrará automáticamente en 4s",
+                Font = new Font("Segoe UI", 8f),
+                ForeColor = Color.FromArgb(170, 175, 180),
+                TextAlign = ContentAlignment.MiddleCenter,
+                Location = new Point(0, popup.Height - 28),
+                Size = new Size(420, 20)
+            };
+            popup.Controls.Add(lblTimer);
+
+            Button btnCerrar = new Button
+            {
+                Text = "ACEPTAR",
+                Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+                ForeColor = Color.White, BackColor = VerdeEsm,
+                FlatStyle = FlatStyle.Flat,
+                Location = new Point(140, 315), Size = new Size(140, 38),
+                Cursor = Cursors.Hand, DialogResult = DialogResult.OK
+            };
+            btnCerrar.FlatAppearance.BorderSize = 0;
+            popup.Controls.Add(btnCerrar);
+
+            // Auto-cierre timer
+            int secondsLeft = 4;
+            var timer = new System.Windows.Forms.Timer { Interval = 1000 };
+            timer.Tick += (ts, te) =>
+            {
+                secondsLeft--;
+                lblTimer.Text = $"Se cerrará automáticamente en {secondsLeft}s";
+
+                // Animar barra de progreso
+                double pct = (4 - secondsLeft) / 4.0;
+                progressBar.Width = (int)(popup.Width * (1 - pct));
+
+                if (secondsLeft <= 0)
+                {
+                    timer.Stop(); timer.Dispose();
+                    if (!popup.IsDisposed) { popup.DialogResult = DialogResult.OK; popup.Close(); }
+                }
+            };
+
+            popup.Shown += (s, ev) => timer.Start();
+            popup.FormClosed += (s, ev) => { timer.Stop(); timer.Dispose(); };
+            popup.ShowDialog(owner);
+        }
+    }
+}

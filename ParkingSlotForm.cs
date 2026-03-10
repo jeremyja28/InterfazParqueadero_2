@@ -71,7 +71,7 @@ namespace InterfazParqueadero
     /// <summary>
     /// Formulario de mapa visual del parqueadero — Vista gráfica de disponibilidad por tipo.
     /// </summary>
-    public class ParkingSlotForm : Form
+    public partial class ParkingSlotForm : Form
     {
         // ═══════════════════════════════════════════════════════════
         // PALETA PUCESA
