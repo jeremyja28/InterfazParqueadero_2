@@ -28,13 +28,22 @@ namespace InterfazParqueadero
         private static readonly Color VerdeEsm    = Color.FromArgb(40, 167, 69);
         private static readonly Color AmarilloBorde = Color.FromArgb(255, 193, 7);
 
-        // ── Controles principales ──
+        // ── Controles principales (Tab 1 — Recaudación) ──
         private ComboBox        cmbFiltro          = null!;
         private DateTimePicker  dtpInicio          = null!;
         private DateTimePicker  dtpFinal           = null!;
         private Label           lblTotalRecaudado  = null!;
         private Label           lblTotalVisitantes = null!;
         private DataGridView    dgv                = null!;
+
+        // ── Controles Tab 2 — Reporte por Persona ──
+        private TextBox        txtBuscarCedula   = null!;
+        private TextBox        txtBuscarNombre   = null!;
+        private DateTimePicker dtpPersonaDesde   = null!;
+        private DateTimePicker dtpPersonaHasta   = null!;
+        private Label          lblConteoPersona  = null!;
+        private DataGridView   dgvPersona        = null!;
+        private List<RegistroAcceso> _accesosFiltrados = new();
 
         // Lista de tickets actualmente mostrados en el grid
         private List<TicketVisitante> _ticketsFiltrados = new();
@@ -44,6 +53,13 @@ namespace InterfazParqueadero
 
         // Nombre de la impresora térmica ESC/POS (cámbielo si su cola se llama diferente)
         private string nombreImpresora = "EPSON TM-T20III Receipt";
+
+        /// <summary>
+        /// Nombre del usuario en sesión que abrió el módulo de reportes.
+        /// Se asigna desde Form1 al instanciar: new ReportesVisitantesForm { NombreUsuario = NombreOperador }
+        /// </summary>
+        [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+        public string NombreUsuario { get; set; } = "Sistema";
 
         public ReportesVisitantesForm()
         {
@@ -466,10 +482,34 @@ namespace InterfazParqueadero
             panelGrid.Controls.Add(dgvColHeader); // 2) Top   — va debajo de gridTitle
             panelGrid.Controls.Add(gridTitle);    // 3) Top   — último = queda más arriba
 
-            // ── ORDEN DE DOCK (Fill primero, luego Top en order inverso) ─────
-            Controls.Add(panelGrid);
-            Controls.Add(panelCards);
-            Controls.Add(toolbar);
+            // ── ORDEN DE DOCK: Tab 1 recibe toolbar/cards/grid; TabControl al form ────
+            var tab1 = new TabPage("\ud83d\udcca  Recaudación y Visitantes")
+            {
+                BackColor = FondoClaro,
+                UseVisualStyleBackColor = false
+            };
+            // WinForms Dock dentro de TabPage: Fill primero, luego Top en orden inverso.
+            tab1.Controls.Add(panelGrid);
+            tab1.Controls.Add(panelCards);
+            tab1.Controls.Add(toolbar);
+
+            var tab2 = new TabPage("\ud83d\udd0d  Reporte por Persona")
+            {
+                BackColor = FondoClaro,
+                UseVisualStyleBackColor = false
+            };
+            ConstruirTabPersona(tab2);
+
+            var tc = new TabControl
+            {
+                Dock    = DockStyle.Fill,
+                Font    = new Font("Segoe UI", 10f, FontStyle.Bold),
+                Padding = new Point(14, 5)
+            };
+            tc.TabPages.Add(tab1);
+            tc.TabPages.Add(tab2);
+
+            Controls.Add(tc);
             Controls.Add(header);
 
             ResumeLayout(true);
@@ -633,6 +673,7 @@ namespace InterfazParqueadero
                     .Separator()
                     .TextLine($"Fecha  : {DateTime.Now:dd/MM/yyyy  HH:mm:ss}")
                     .TextLine($"Periodo: {periodo}")
+                    .TextLine($"Generado por: {NombreUsuario}")
                     .Separator()
                     // ── DETALLE ──────────────────────────────────
                     .Left()
@@ -689,6 +730,8 @@ namespace InterfazParqueadero
                 var sb = new StringBuilder();
                 // BOM UTF-8 para compatibilidad con Excel en versiones en español
                 sb.Append('\uFEFF');
+                // Encabezado de auditoría
+                sb.AppendLine($"# Reporte generado el {DateTime.Now:dd/MM/yyyy HH:mm:ss} por: {NombreUsuario}");
                 sb.AppendLine("Código,Placa,Fecha Entrada,Fecha Salida,Estado,Total Pagado,Observación");
 
                 foreach (var t in _ticketsFiltrados)
@@ -719,6 +762,394 @@ namespace InterfazParqueadero
             {
                 MessageBox.Show(
                     $"Error al exportar el archivo:\n{ex.Message}",
+                    "Error de Exportación", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // TAB 2 — REPORTE POR PERSONA
+        // ═══════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Construye toda la UI dentro de la segunda pestaña: filtros de búsqueda
+        /// (cédula / nombre + rango de fechas), tarjeta de conteo y grid de accesos.
+        /// </summary>
+        private void ConstruirTabPersona(TabPage tab)
+        {
+            // ── BARRA DE FILTROS ── Dock=Top ────────────────────────────────
+            Panel barraFiltros = new Panel
+            {
+                Dock      = DockStyle.Top,
+                Height    = 110,
+                BackColor = BlancoCard,
+                Padding   = new Padding(16, 0, 16, 0)
+            };
+            barraFiltros.Paint += (s, e) =>
+            {
+                using Pen p = new Pen(Color.FromArgb(210, 218, 230), 1);
+                e.Graphics.DrawLine(p, 0, barraFiltros.Height - 1, barraFiltros.Width, barraFiltros.Height - 1);
+            };
+
+            // ── Fila 1: Cédula + Nombre ─────────────────────────────────────
+            int y1 = 14;
+            barraFiltros.Controls.Add(new Label
+            {
+                Text      = "Cédula:",
+                Font      = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(80, 95, 110),
+                Location  = new Point(16, y1 + 3), AutoSize = true
+            });
+            txtBuscarCedula = new TextBox
+            {
+                Location    = new Point(80, y1), Size = new Size(160, 28),
+                Font        = new Font("Segoe UI", 10f),
+                PlaceholderText = "Ej: 1802345678"
+            };
+            barraFiltros.Controls.Add(txtBuscarCedula);
+
+            barraFiltros.Controls.Add(new Label
+            {
+                Text      = "Nombre:",
+                Font      = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(80, 95, 110),
+                Location  = new Point(260, y1 + 3), AutoSize = true
+            });
+            txtBuscarNombre = new TextBox
+            {
+                Location    = new Point(330, y1), Size = new Size(240, 28),
+                Font        = new Font("Segoe UI", 10f),
+                PlaceholderText = "Buscar por nombre o apellido"
+            };
+            barraFiltros.Controls.Add(txtBuscarNombre);
+
+            // ── Fila 2: Fecha Desde / Hasta + botones ───────────────────────
+            int y2 = 60;
+            barraFiltros.Controls.Add(new Label
+            {
+                Text      = "Desde:",
+                Font      = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+                ForeColor = TextoOscuro,
+                Location  = new Point(16, y2 + 3), AutoSize = true
+            });
+            dtpPersonaDesde = new DateTimePicker
+            {
+                Location = new Point(72, y2), Size = new Size(148, 28),
+                Font     = new Font("Segoe UI", 10f),
+                Format   = DateTimePickerFormat.Short,
+                Value    = DateTime.Today.AddDays(-30)
+            };
+            barraFiltros.Controls.Add(dtpPersonaDesde);
+
+            barraFiltros.Controls.Add(new Label
+            {
+                Text      = "Hasta:",
+                Font      = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+                ForeColor = TextoOscuro,
+                Location  = new Point(236, y2 + 3), AutoSize = true
+            });
+            dtpPersonaHasta = new DateTimePicker
+            {
+                Location = new Point(292, y2), Size = new Size(148, 28),
+                Font     = new Font("Segoe UI", 10f),
+                Format   = DateTimePickerFormat.Short,
+                Value    = DateTime.Today
+            };
+            barraFiltros.Controls.Add(dtpPersonaHasta);
+
+            var btnBuscar = new Button
+            {
+                Text      = "🔍  Buscar",
+                Font      = new Font("Segoe UI", 10f, FontStyle.Bold),
+                ForeColor = Color.White, BackColor = AzulInst,
+                FlatStyle = FlatStyle.Flat,
+                Location  = new Point(460, y2 - 2), Size = new Size(140, 34),
+                Cursor    = Cursors.Hand
+            };
+            btnBuscar.FlatAppearance.BorderSize = 0;
+            btnBuscar.Click += (s, e) => BuscarPorPersona();
+            barraFiltros.Controls.Add(btnBuscar);
+
+            var btnLimpiar = new Button
+            {
+                Text      = "✕  Limpiar",
+                Font      = new Font("Segoe UI", 10f),
+                ForeColor = TextoOscuro, BackColor = Color.FromArgb(220, 226, 236),
+                FlatStyle = FlatStyle.Flat,
+                Location  = new Point(614, y2 - 2), Size = new Size(120, 34),
+                Cursor    = Cursors.Hand
+            };
+            btnLimpiar.FlatAppearance.BorderSize = 0;
+            btnLimpiar.Click += (s, e) =>
+            {
+                txtBuscarCedula.Clear();
+                txtBuscarNombre.Clear();
+                dtpPersonaDesde.Value = DateTime.Today.AddDays(-30);
+                dtpPersonaHasta.Value = DateTime.Today;
+                dgvPersona.Rows.Clear();
+                lblConteoPersona.Text = "Ingrese un criterio de búsqueda y presione Buscar.";
+                lblConteoPersona.ForeColor = Color.FromArgb(100, 115, 140);
+            };
+            barraFiltros.Controls.Add(btnLimpiar);
+
+            var btnExportarPersona = new Button
+            {
+                Text      = "📥  Exportar CSV",
+                Font      = new Font("Segoe UI", 10f, FontStyle.Bold),
+                ForeColor = Color.White, BackColor = Color.FromArgb(39, 129, 80),
+                FlatStyle = FlatStyle.Flat,
+                Location  = new Point(752, y2 - 2), Size = new Size(170, 34),
+                Cursor    = Cursors.Hand
+            };
+            btnExportarPersona.FlatAppearance.BorderSize = 0;
+            btnExportarPersona.Click += (s, e) => ExportarCSVPersona();
+            barraFiltros.Controls.Add(btnExportarPersona);
+
+            // Permitir buscar con Enter desde los campos de texto
+            txtBuscarCedula.KeyDown  += (s, e) => { if (e.KeyCode == Keys.Enter) BuscarPorPersona(); };
+            txtBuscarNombre.KeyDown  += (s, e) => { if (e.KeyCode == Keys.Enter) BuscarPorPersona(); };
+
+            // ── TARJETA DE CONTEO ── Dock=Top ───────────────────────────────
+            Panel panelConteo = new Panel
+            {
+                Dock      = DockStyle.Top,
+                Height    = 56,
+                BackColor = Color.FromArgb(235, 243, 255),
+                Padding   = new Padding(20, 0, 0, 0)
+            };
+            panelConteo.Paint += (s, e) =>
+            {
+                using Pen p = new Pen(Color.FromArgb(74, 144, 217), 2);
+                e.Graphics.DrawLine(p, 0, 0, 0, panelConteo.Height);
+                using Pen pBot = new Pen(Color.FromArgb(200, 215, 240), 1);
+                e.Graphics.DrawLine(pBot, 0, panelConteo.Height - 1, panelConteo.Width, panelConteo.Height - 1);
+            };
+            lblConteoPersona = new Label
+            {
+                Text      = "Ingrese un criterio de búsqueda y presione Buscar.",
+                Font      = new Font("Segoe UI", 11f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(100, 115, 140),
+                Dock      = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Padding   = new Padding(22, 0, 0, 0)
+            };
+            panelConteo.Controls.Add(lblConteoPersona);
+
+            // ── CABECERA DEL GRID ── Dock=Top ───────────────────────────────
+            Panel dgvPersHeader = new Panel
+            {
+                Dock      = DockStyle.Top,
+                Height    = 40,
+                BackColor = AzulOscuro
+            };
+            string[] hdrTexts  = { "  Cédula", "  Nombre Completo", "  Hora Entrada", "  Hora Salida", "  Duración", "  Tag ID", "  Placa", "  Tipo" };
+            float[]  hdrWidths = { 12f, 24f, 14f, 14f, 10f, 10f, 10f, 6f };
+            var tlpH = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill, ColumnCount = hdrTexts.Length, RowCount = 1,
+                BackColor = Color.Transparent, Margin = new Padding(0), Padding = new Padding(0),
+                CellBorderStyle = TableLayoutPanelCellBorderStyle.None
+            };
+            foreach (var w in hdrWidths) tlpH.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, w));
+            for (int i = 0; i < hdrTexts.Length; i++)
+            {
+                tlpH.Controls.Add(new Label
+                {
+                    Text = hdrTexts[i], Dock = DockStyle.Fill,
+                    Font = new Font("Segoe UI", 9f, FontStyle.Bold), ForeColor = Color.White,
+                    TextAlign = ContentAlignment.MiddleLeft, BackColor = Color.Transparent
+                }, i, 0);
+            }
+            dgvPersHeader.Controls.Add(tlpH);
+
+            // ── GRID DE ACCESOS ── Dock=Fill ────────────────────────────────
+            dgvPersona = new DataGridView
+            {
+                Dock        = DockStyle.Fill,
+                ReadOnly    = true,
+                AllowUserToAddRows    = false,
+                AllowUserToDeleteRows = false,
+                AllowUserToResizeRows = false,
+                MultiSelect           = false,
+                SelectionMode         = DataGridViewSelectionMode.FullRowSelect,
+                AutoSizeColumnsMode   = DataGridViewAutoSizeColumnsMode.Fill,
+                AutoSizeRowsMode      = DataGridViewAutoSizeRowsMode.AllCells,
+                BackgroundColor       = BlancoCard,
+                BorderStyle           = BorderStyle.None,
+                RowHeadersVisible     = false,
+                ColumnHeadersVisible  = false,
+                Font                  = new Font("Segoe UI", 10f),
+                GridColor             = Color.FromArgb(220, 226, 236),
+                CellBorderStyle       = DataGridViewCellBorderStyle.SingleHorizontal,
+                EnableHeadersVisualStyles = false,
+                RowTemplate = { Height = 34 }
+            };
+            dgvPersona.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(248, 250, 253);
+            dgvPersona.DefaultCellStyle.SelectionBackColor = Color.FromArgb(210, 228, 255);
+            dgvPersona.DefaultCellStyle.SelectionForeColor = TextoOscuro;
+
+            dgvPersona.Columns.Add(new DataGridViewTextBoxColumn { Name = "Cedula",        HeaderText = "Cédula",          FillWeight = 12 });
+            dgvPersona.Columns.Add(new DataGridViewTextBoxColumn { Name = "Nombre",         HeaderText = "Nombre Completo", FillWeight = 24 });
+            dgvPersona.Columns.Add(new DataGridViewTextBoxColumn { Name = "HoraEntrada",    HeaderText = "Hora Entrada",    FillWeight = 14 });
+            dgvPersona.Columns.Add(new DataGridViewTextBoxColumn { Name = "HoraSalida",     HeaderText = "Hora Salida",     FillWeight = 14 });
+            dgvPersona.Columns.Add(new DataGridViewTextBoxColumn { Name = "Duracion",       HeaderText = "Duración",        FillWeight = 10 });
+            dgvPersona.Columns.Add(new DataGridViewTextBoxColumn { Name = "TagID",          HeaderText = "Tag ID",          FillWeight = 10 });
+            dgvPersona.Columns.Add(new DataGridViewTextBoxColumn { Name = "Placa",          HeaderText = "Placa",           FillWeight = 10 });
+            dgvPersona.Columns.Add(new DataGridViewTextBoxColumn { Name = "Tipo",           HeaderText = "Tipo",            FillWeight = 6  });
+
+            // Alinear fechas y duración al centro
+            foreach (string col in new[] { "HoraEntrada", "HoraSalida", "Duracion" })
+                dgvPersona.Columns[col]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+
+            // Dock WinForms: Fill primero, luego Top en orden inverso
+            Panel panelGrid2 = new Panel { Dock = DockStyle.Fill, BackColor = FondoClaro, Padding = new Padding(14, 6, 14, 14) };
+            panelGrid2.Controls.Add(dgvPersona);
+            panelGrid2.Controls.Add(dgvPersHeader);
+
+            tab.Controls.Add(panelGrid2);
+            tab.Controls.Add(panelConteo);
+            tab.Controls.Add(barraFiltros);
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // LÓGICA DE BÚSQUEDA POR PERSONA
+        // ═══════════════════════════════════════════════════════════
+        private void BuscarPorPersona()
+        {
+            string cedulaBusq = txtBuscarCedula.Text.Trim();
+            string nombreBusq = txtBuscarNombre.Text.Trim().ToLowerInvariant();
+            var    desde      = dtpPersonaDesde.Value.Date;
+            var    hasta      = dtpPersonaHasta.Value.Date;
+
+            if (desde > hasta) (desde, hasta) = (hasta, desde);
+
+            // Recargar desde JSON para tener datos frescos
+            AuditoriaService.Inicializar();
+
+            var fuente = AuditoriaService.Accesos.AsEnumerable();
+
+            // ── Filtro de rango de fechas ────────────────────────
+            fuente = fuente.Where(r => r.FechaEntrada.Date >= desde && r.FechaEntrada.Date <= hasta);
+
+            // ── Filtro por cédula (si se ingresó) ───────────────
+            if (!string.IsNullOrEmpty(cedulaBusq))
+                fuente = fuente.Where(r => r.Cedula.Contains(cedulaBusq, StringComparison.OrdinalIgnoreCase));
+
+            // ── Filtro por nombre (si se ingresó) ───────────────
+            if (!string.IsNullOrEmpty(nombreBusq))
+                fuente = fuente.Where(r =>
+                    r.NombreCompleto.ToLowerInvariant().Contains(nombreBusq));
+
+            // ── Requiere al menos un filtro de identidad ─────────
+            if (string.IsNullOrEmpty(cedulaBusq) && string.IsNullOrEmpty(nombreBusq))
+            {
+                lblConteoPersona.Text      = "⚠  Ingrese al menos una Cédula o un Nombre para buscar.";
+                lblConteoPersona.ForeColor = Color.FromArgb(180, 80, 0);
+                return;
+            }
+
+            _accesosFiltrados = fuente.OrderByDescending(r => r.FechaEntrada).ToList();
+
+            // ── Tarjeta de conteo ────────────────────────────────
+            int total   = _accesosFiltrados.Count;
+            int activos = _accesosFiltrados.Count(r => !r.FechaSalida.HasValue);
+
+            if (total == 0)
+            {
+                lblConteoPersona.Text      = "Sin resultados para ese criterio en el rango indicado.";
+                lblConteoPersona.ForeColor = Color.FromArgb(150, 60, 60);
+            }
+            else
+            {
+                // Nombre representativo del primer resultado
+                string persona = _accesosFiltrados[0].NombreCompleto;
+                if (string.IsNullOrWhiteSpace(persona)) persona = _accesosFiltrados[0].Cedula;
+                lblConteoPersona.Text      = $"✅  {persona}  —  {total} acceso(s) registrado(s)"
+                                           + $"  |  {desde:dd/MM/yyyy} → {hasta:dd/MM/yyyy}"
+                                           + (activos > 0 ? $"  |  {activos} actualmente adentro" : "");
+                lblConteoPersona.ForeColor = AzulOscuro;
+            }
+
+            // ── Poblar DataGridView ──────────────────────────────
+            dgvPersona.Rows.Clear();
+            foreach (var r in _accesosFiltrados)
+            {
+                string salida   = r.FechaSalida.HasValue
+                    ? r.FechaSalida.Value.ToString("dd/MM/yyyy HH:mm:ss")
+                    : "— En parqueadero —";
+                string duracion = r.Duracion;
+                string tagId    = string.IsNullOrEmpty(r.TagID) ? "—" : r.TagID;
+                string placa    = string.IsNullOrEmpty(r.Placa) ? "—" : r.Placa;
+                string cedula   = string.IsNullOrEmpty(r.Cedula) ? "N/A" : r.Cedula;
+
+                int idx = dgvPersona.Rows.Add(
+                    cedula,
+                    r.NombreCompleto,
+                    r.FechaEntrada.ToString("dd/MM/yyyy HH:mm:ss"),
+                    salida,
+                    duracion,
+                    tagId,
+                    placa,
+                    r.Tipo);
+
+                // Resaltar vehículos actualmente adentro
+                if (!r.FechaSalida.HasValue)
+                {
+                    dgvPersona.Rows[idx].DefaultCellStyle.ForeColor = Color.FromArgb(30, 120, 30);
+                    dgvPersona.Rows[idx].DefaultCellStyle.Font = new Font("Segoe UI", 10f, FontStyle.Bold);
+                }
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // EXPORTACIÓN CSV — Reporte por Persona
+        // ═══════════════════════════════════════════════════════════
+        private void ExportarCSVPersona()
+        {
+            if (_accesosFiltrados.Count == 0)
+            {
+                MessageBox.Show(
+                    "No hay datos para exportar. Realice una búsqueda primero.",
+                    "Sin datos", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            string nombreArchivo = string.IsNullOrEmpty(txtBuscarCedula.Text.Trim())
+                ? $"Reporte_Persona_{DateTime.Now:yyyyMMdd_HHmm}.csv"
+                : $"Reporte_{txtBuscarCedula.Text.Trim()}_{DateTime.Now:yyyyMMdd_HHmm}.csv";
+
+            using var dlg = new SaveFileDialog
+            {
+                Title      = "Exportar Reporte por Persona",
+                DefaultExt = "csv",
+                Filter     = "Archivo CSV (*.csv)|*.csv|Todos los archivos (*.*)|*.*",
+                FileName   = nombreArchivo
+            };
+            if (dlg.ShowDialog() != DialogResult.OK) return;
+
+            try
+            {
+                var sb = new StringBuilder();
+                sb.Append('\uFEFF');
+                sb.AppendLine($"# Reporte por Persona — generado el {DateTime.Now:dd/MM/yyyy HH:mm:ss} por: {NombreUsuario}");
+                sb.AppendLine("Cédula,Nombre Completo,Fecha Entrada,Fecha Salida,Duración,Tag ID,Placa,Tipo");
+
+                foreach (var r in _accesosFiltrados)
+                {
+                    string salida   = r.FechaSalida.HasValue ? r.FechaSalida.Value.ToString("dd/MM/yyyy HH:mm:ss") : "";
+                    string cedula   = r.Cedula.Replace(",", "");
+                    string nombre   = r.NombreCompleto.Replace(",", " ").Replace("\"", "'");
+                    string tagId    = r.TagID.Replace(",", "");
+                    string placa    = r.Placa.Replace(",", "");
+                    sb.AppendLine($"{cedula},{nombre},{r.FechaEntrada:dd/MM/yyyy HH:mm:ss},{salida},{r.Duracion},{tagId},{placa},{r.Tipo}");
+                }
+
+                File.WriteAllText(dlg.FileName, sb.ToString(), Encoding.UTF8);
+                MessageBox.Show($"Reporte exportado:\n{dlg.FileName}",
+                    "Exportación Exitosa", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error al exportar:\n{ex.Message}",
                     "Error de Exportación", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }

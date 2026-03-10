@@ -21,6 +21,8 @@ namespace InterfazParqueadero
         public string Cedula          { get; set; } = "";
         public string NombreCompleto  { get; set; } = "";
         public string Placa           { get; set; } = "";
+        /// <summary>Tag RFID que originó el acceso. Vacío para visitantes sin tag.</summary>
+        public string TagID           { get; set; } = "";
 
         [JsonIgnore]
         public string CedulaMostrar => string.IsNullOrWhiteSpace(Cedula) ? "N/A" : Cedula;
@@ -102,7 +104,8 @@ namespace InterfazParqueadero
         // REGISTRAR ACCESO  –  entrada de un vehículo
         // ═════════════════════════════════════════════════════════════════════
         /// <param name="tipo">"TAG", "VISITANTE" o "MOTO"</param>
-        public static void RegistrarAcceso(string tipo, string cedula, string nombre, string placa)
+        /// <param name="tagId">Identificador RFID del tag (solo para tipo TAG).</param>
+        public static void RegistrarAcceso(string tipo, string cedula, string nombre, string placa, string tagId = "")
         {
             var r = new RegistroAcceso
             {
@@ -112,7 +115,8 @@ namespace InterfazParqueadero
                 Tipo           = tipo.Trim().ToUpper(),
                 Cedula         = cedula.Trim(),
                 NombreCompleto = nombre.Trim(),
-                Placa          = placa.Trim().ToUpper()
+                Placa          = placa.Trim().ToUpper(),
+                TagID          = tagId.Trim()
             };
             _accesos.Add(r);
             GuardarAccesos();
@@ -170,7 +174,8 @@ namespace InterfazParqueadero
         // ═════════════════════════════════════════════════════════════════════
         // MÉTODO LEGADO  Registrar(...)  –  redirige al nuevo modelo
         // ═════════════════════════════════════════════════════════════════════
-        public static void Registrar(string accion, string tipo, string cedula, string nombre, string placa)
+        /// <param name="tagId">Opcional — identificador RFID para eventos de tipo TAG.</param>
+        public static void Registrar(string accion, string tipo, string cedula, string nombre, string placa, string tagId = "")
         {
             string accionUp = accion.Trim().ToUpper();
             string tipoUp   = tipo.Trim().ToUpper();
@@ -182,7 +187,7 @@ namespace InterfazParqueadero
             }
             if (accionUp == "ENTRÓ")
             {
-                RegistrarAcceso(tipoUp, cedula, nombre, placa);
+                RegistrarAcceso(tipoUp, cedula, nombre, placa, tagId);
                 return;
             }
             if (accionUp == "SALIÓ")

@@ -426,7 +426,8 @@ namespace InterfazParqueadero
             _btnReportes = CrearBtnSidebar("📊  Reportes / Corte de Caja", 318);
             _btnReportes.Click += (s, e) =>
             {
-                using var f = new ReportesVisitantesForm();
+                // Se pasa el NombreOperador para que el reporte registre quién lo generó
+                using var f = new ReportesVisitantesForm { NombreUsuario = NombreOperador };
                 f.ShowDialog(this);
             };
             panelSidebar.Controls.Add(_btnReportes);
@@ -447,6 +448,9 @@ namespace InterfazParqueadero
                 }
             };
             panelSidebar.Controls.Add(_btnResetEstado);
+
+            // (8) Gestión de Usuarios — se agrega en Form1_Load porque
+            // RolUsuario aún no está asignado durante la construcción del form.
 
             // Configuración → y=402 (ya está en Designer)
         }
@@ -1412,7 +1416,7 @@ namespace InterfazParqueadero
                     AgregarAuditoria("Acceso Autorizado (Entrada)", $"{nombreUsuario} — Tarjeta {numeroTarjeta}");
                     AuditoriaService.Registrar("ENTRÓ", "TAG",
                         vehiculoLocal?.Cedula ?? tagInfoSQL?.Cedula ?? "", nombreUsuario,
-                        vehiculoLocal?.Placa  ?? tagInfoSQL?.Placa  ?? "");
+                        vehiculoLocal?.Placa  ?? tagInfoSQL?.Placa  ?? "", numeroTarjeta);
                     zkManager.LevantarBrazo(puerta: 1);
                     MostrarBarreraArriba();
                     _ = LogAccesoSQLAsync(numeroTarjeta, puertaID, "ENTRADA", "AUTOMATICO", tagInfoSQL, vehiculoLocal);
@@ -1427,7 +1431,7 @@ namespace InterfazParqueadero
                     AgregarAuditoria("Acceso Autorizado (Salida)", $"{nombreUsuario} — Tarjeta {numeroTarjeta}");
                     AuditoriaService.Registrar("SALIÓ", "TAG",
                         vehiculoLocal?.Cedula ?? tagInfoSQL?.Cedula ?? "", nombreUsuario,
-                        vehiculoLocal?.Placa  ?? tagInfoSQL?.Placa  ?? "");
+                        vehiculoLocal?.Placa  ?? tagInfoSQL?.Placa  ?? "", numeroTarjeta);
                     zkManager.LevantarBrazo(puerta: 1, cancelarLock2: true);
                     MostrarBarreraArriba();
                     _ = LogAccesoSQLAsync(numeroTarjeta, puertaID, "SALIDA", "AUTOMATICO", tagInfoSQL, vehiculoLocal);
@@ -1446,7 +1450,7 @@ namespace InterfazParqueadero
                     $"{nombreUsuario} — Tarjeta {numeroTarjeta} (Override InBIO)");
                 AuditoriaService.Registrar(esSalida ? "SALIÓ" : "ENTRÓ", "TAG",
                     vehiculoLocal?.Cedula ?? tagInfoSQL?.Cedula ?? "", nombreUsuario,
-                    vehiculoLocal?.Placa  ?? tagInfoSQL?.Placa  ?? "");
+                    vehiculoLocal?.Placa  ?? tagInfoSQL?.Placa  ?? "", numeroTarjeta);
                 if (!esSalida) zkManager.LevantarBrazo(puerta: 1);
                 else           zkManager.LevantarBrazo(puerta: 1, cancelarLock2: true);
                 MostrarBarreraArriba();
@@ -1585,6 +1589,28 @@ namespace InterfazParqueadero
             toolStripStatusLabel.Text = $"  Sistema de Control — {GaritaAsignada} — {NombreOperador} — iniciado.";
             ActualizarResumenCajaDiaria();
             ActualizarTarjetasCapacidad();
+
+            // Control de visibilidad por rol (se aplica aquí porque RolUsuario
+            // se asigna en Program.cs DESPUÉS de que el constructor termina)
+            bool esAdmin = RolUsuario == "Administrador" || RolUsuario == "SuperAdministrador";
+
+            // Bitácora, Configuración y Resetear Tags: solo Administrador / SuperAdministrador
+            if (_btnLogsSistema  != null) _btnLogsSistema.Visible  = esAdmin;
+            if (_btnResetEstado  != null) _btnResetEstado.Visible  = esAdmin;
+            btnNavConfiguracion.Visible = esAdmin;
+
+            // Gestión de Usuarios: solo Administrador / SuperAdministrador
+            if (esAdmin)
+            {
+                var btnUsuarios = CrearBtnSidebar("👑  Gestión de Usuarios", 444);
+                btnUsuarios.ForeColor = Color.FromArgb(255, 215, 0);
+                btnUsuarios.Click += (s, e) =>
+                {
+                    using var f = new UserManagementForm { NombreCreador = NombreOperador };
+                    f.ShowDialog(this);
+                };
+                panelSidebar.Controls.Add(btnUsuarios);
+            }
         }
 
         private void BtnConectar_Click(object? sender, EventArgs e)

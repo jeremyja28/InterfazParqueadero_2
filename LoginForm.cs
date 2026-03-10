@@ -32,9 +32,10 @@ namespace InterfazParqueadero
         // ═══════════════════════════════════════════════════════════
         private static readonly Dictionary<string, (string Password, string Rol, string NombreMostrar, string Garita)> Credenciales = new(StringComparer.OrdinalIgnoreCase)
         {
-            ["operador1"] = ("pucesa2026", "Operador", "Operador 1", "Garita Principal"),
-            ["operador2"] = ("pucesa2026", "Operador", "Operador 2", "Garita Secundaria"),
-            ["admin"]     = ("admin2026",  "Administrador", "Administrador", "Garita Principal"),
+            ["operador1"]  = ("pucesa2026",     "Operador",            "Operador 1",        "Garita Principal"),
+            ["operador2"]  = ("pucesa2026",     "Operador",            "Operador 2",        "Garita Secundaria"),
+            ["admin"]      = ("admin2026",      "Administrador",       "Administrador",     "Garita Principal"),
+            ["superadmin"] = ("superadmin2026", "SuperAdministrador",  "Super Administrador", "Garita Principal"),
         };
 
         // ═══════════════════════════════════════════════════════════
@@ -430,23 +431,46 @@ namespace InterfazParqueadero
                 return;
             }
 
-            if (!Credenciales.TryGetValue(usuario, out var cred) || cred.Password != password)
+            // ── 1) Intentar con credenciales hardcoded (admins originales) ──────
+            if (Credenciales.TryGetValue(usuario, out var cred) && cred.Password == password)
+            {
+                RolSeleccionado = cred.Rol;
+                NombreUsuario   = cred.NombreMostrar;
+                GaritaAsignada  = cred.Garita;
+                DialogResult    = DialogResult.OK;
+                Close();
+                return;
+            }
+
+            // ── 2) Intentar con usuarios registrados en JSON (UserService) ──────
+            // Primero verificar si el usuario existe pero está inactivo
+            var candidato = UserService.BuscarPorUsername(usuario);
+            if (candidato != null && !candidato.IsActivo)
             {
                 _intentosFallidos++;
-                int restantes = 5 - _intentosFallidos;
-                MostrarError($"Credenciales incorrectas. Intentos restantes: {restantes}");
+                MostrarError("Cuenta deshabilitada. Contacte al Super Administrador.");
                 txtPassword.Clear();
                 txtPassword.Focus();
                 return;
             }
 
-            // Login exitoso
-            RolSeleccionado = cred.Rol;
-            NombreUsuario   = cred.NombreMostrar;
-            GaritaAsignada  = cred.Garita;
+            var jsonUser = UserService.ValidarCredenciales(usuario, password);
+            if (jsonUser != null)
+            {
+                RolSeleccionado = jsonUser.Rol;
+                NombreUsuario   = jsonUser.NombreMostrar;
+                GaritaAsignada  = jsonUser.Garita;
+                DialogResult    = DialogResult.OK;
+                Close();
+                return;
+            }
 
-            DialogResult = DialogResult.OK;
-            Close();
+            // ── 3) Credenciales incorrectas ────────────────────────────────────
+            _intentosFallidos++;
+            int restantes = 5 - _intentosFallidos;
+            MostrarError($"Credenciales incorrectas. Intentos restantes: {restantes}");
+            txtPassword.Clear();
+            txtPassword.Focus();
         }
 
         private void MostrarError(string mensaje)

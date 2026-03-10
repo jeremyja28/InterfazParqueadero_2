@@ -1,0 +1,12 @@
+﻿[
+  {
+    "Username": "hola123",
+    "PasswordHash": "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
+    "Rol": "Operador",
+    "NombreMostrar": "Fausto",
+    "Garita": "Garita Principal",
+    "FechaCreacion": "2026-03-10T09:52:11.6610427-05:00",
+    "CreadoPor": "Super Administrador",
+    "IsActivo": true
+  }
+]
